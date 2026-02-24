@@ -1,4 +1,4 @@
-const MOONSHOT_BASE_URL = "https://api.moonshot.cn/v1";
+const MOONSHOT_BASE_URL = "https://api.moonshot.ai/v1";
 const AGENT_SESSION_KEY = "agent:main:subagent:673d211b-aea1-44a8-9df9-0ab6c367b4ab";
 
 const SYSTEM_PROMPT = `You are X Marketer, a professional Twitter/X marketing strategist and content creator. You are connected to session: ${AGENT_SESSION_KEY}
@@ -56,7 +56,7 @@ export async function generateDailyReport(): Promise<any> {
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: "moonshot-v1-32k",
+      model: "kimi-latest",
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         {
