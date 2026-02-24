@@ -53,6 +53,38 @@ function TrendItem({
   );
 }
 
+const typeColors: Record<string, string> = {
+  hook: "#E8B84B",
+  thread: "#6C9BF2",
+  tip: "#4CAF7C",
+  poll: "#B67CE8",
+  storytelling: "#E88B6C",
+};
+
+const typeIcons: Record<string, string> = {
+  hook: "flash-outline",
+  thread: "layers-outline",
+  tip: "bulb-outline",
+  poll: "bar-chart-outline",
+  storytelling: "book-outline",
+};
+
+function ThreadTweetItem({ tweet, num }: { tweet: string; num: number }) {
+  return (
+    <View style={styles.threadTweetItem}>
+      <View style={styles.threadLeft}>
+        <View style={styles.threadNum}>
+          <Text style={styles.threadNumText}>{num}</Text>
+        </View>
+        {num > 0 && <View style={styles.threadLine} />}
+      </View>
+      <View style={styles.threadContent}>
+        <Text style={styles.threadTweetText}>{tweet}</Text>
+      </View>
+    </View>
+  );
+}
+
 function TweetIdeaItem({
   idea,
   index,
@@ -65,21 +97,10 @@ function TweetIdeaItem({
     transform: [{ scale: scale.value }],
   }));
 
-  const typeColors: Record<string, string> = {
-    hook: "#E8B84B",
-    thread: "#6C9BF2",
-    tip: "#4CAF7C",
-    poll: "#B67CE8",
-    storytelling: "#E88B6C",
-  };
-
-  const typeIcons: Record<string, string> = {
-    hook: "flash-outline",
-    thread: "layers-outline",
-    tip: "bulb-outline",
-    poll: "bar-chart-outline",
-    storytelling: "book-outline",
-  };
+  const isThread =
+    idea.type === "thread" &&
+    idea.threadTweets &&
+    idea.threadTweets.length > 0;
 
   return (
     <Animated.View
@@ -119,31 +140,52 @@ function TweetIdeaItem({
                 {idea.type}
               </Text>
             </View>
-            <View
-              style={[
-                styles.engBadge,
-                {
-                  backgroundColor:
+            <View style={styles.engRow}>
+              {isThread && (
+                <View style={styles.threadCountBadge}>
+                  <Text style={styles.threadCountText}>
+                    {idea.threadTweets!.length} tweets
+                  </Text>
+                </View>
+              )}
+              <View
+                style={[
+                  styles.engBadge,
+                  {
+                    backgroundColor:
+                      idea.estimatedEngagement === "high"
+                        ? "rgba(76, 175, 124, 0.1)"
+                        : "rgba(232, 184, 75, 0.1)",
+                  },
+                ]}
+              >
+                <Ionicons
+                  name={
                     idea.estimatedEngagement === "high"
-                      ? "rgba(76, 175, 124, 0.1)"
-                      : "rgba(232, 184, 75, 0.1)",
-                },
-              ]}
-            >
-              <Ionicons
-                name={
-                  idea.estimatedEngagement === "high"
-                    ? "rocket-outline"
-                    : "pulse-outline"
-                }
-                size={11}
-                color={
-                  idea.estimatedEngagement === "high" ? "#4CAF7C" : Colors.gold
-                }
-              />
+                      ? "rocket-outline"
+                      : "pulse-outline"
+                  }
+                  size={11}
+                  color={
+                    idea.estimatedEngagement === "high"
+                      ? "#4CAF7C"
+                      : Colors.gold
+                  }
+                />
+              </View>
             </View>
           </View>
-          <Text style={styles.tweetContent}>{idea.content}</Text>
+
+          {isThread ? (
+            <View style={styles.threadContainer}>
+              {idea.threadTweets!.map((tweet, i) => (
+                <ThreadTweetItem key={i} tweet={tweet} num={i + 1} />
+              ))}
+            </View>
+          ) : (
+            <Text style={styles.tweetContent}>{idea.content}</Text>
+          )}
+
           <Text style={styles.tweetNotes}>{idea.notes}</Text>
         </View>
       </Pressable>
@@ -374,6 +416,65 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     justifyContent: "center",
     alignItems: "center",
+  },
+  engRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  threadCountBadge: {
+    backgroundColor: "rgba(108, 155, 242, 0.12)",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  threadCountText: {
+    fontFamily: "DMSans_600SemiBold",
+    fontSize: 11,
+    color: "#6C9BF2",
+  },
+  threadContainer: {
+    marginBottom: 10,
+  },
+  threadTweetItem: {
+    flexDirection: "row",
+    gap: 10,
+    minHeight: 40,
+  },
+  threadLeft: {
+    alignItems: "center",
+    width: 28,
+  },
+  threadNum: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "rgba(108, 155, 242, 0.15)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  threadNumText: {
+    fontFamily: "DMSans_700Bold",
+    fontSize: 11,
+    color: "#6C9BF2",
+  },
+  threadLine: {
+    width: 2,
+    flex: 1,
+    backgroundColor: "rgba(108, 155, 242, 0.15)",
+    marginTop: 4,
+    marginBottom: 4,
+    borderRadius: 1,
+  },
+  threadContent: {
+    flex: 1,
+    paddingBottom: 12,
+  },
+  threadTweetText: {
+    fontFamily: "DMSans_400Regular",
+    fontSize: 14,
+    color: Colors.cream,
+    lineHeight: 21,
   },
   tweetContent: {
     fontFamily: "DMSans_400Regular",

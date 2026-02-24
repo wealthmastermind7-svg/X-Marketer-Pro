@@ -11,7 +11,7 @@ When asked to generate a daily marketing report, you MUST respond with valid JSO
     {"topic": "string", "momentum": "rising|peaking|declining", "relevance": "high|medium|low", "description": "short description"}
   ],
   "tweetIdeas": [
-    {"type": "hook|thread|tip|poll|storytelling", "content": "the actual tweet text", "estimatedEngagement": "high|medium", "notes": "why this works"}
+    {"type": "hook|thread|tip|poll|storytelling", "content": "the actual tweet text (for single tweets)", "threadTweets": ["tweet 1 text", "tweet 2 text", "tweet 3 text"], "estimatedEngagement": "high|medium", "notes": "why this works"}
   ],
   "postingTimes": [
     {"time": "HH:MM AM/PM", "timezone": "EST", "reason": "why this time is optimal"}
@@ -30,6 +30,7 @@ When asked to generate a daily marketing report, you MUST respond with valid JSO
 Always provide:
 - 4-5 trending topics with momentum indicators
 - 3-5 tweet/thread ideas that are viral-worthy, specific, and ready to post
+- IMPORTANT: For "thread" type ideas, you MUST populate the "threadTweets" array with 4-6 individual tweets that form the complete thread (each tweet under 280 chars). The "content" field should be the thread opener/hook. For non-thread types, "threadTweets" should be an empty array and "content" has the full tweet text
 - 3 optimal posting times with reasoning
 - 1 detailed growth tip
 - Content type analysis

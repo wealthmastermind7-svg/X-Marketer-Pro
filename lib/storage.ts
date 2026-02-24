@@ -15,6 +15,7 @@ export interface DailyReport {
   tweetIdeas: Array<{
     type: "hook" | "thread" | "tip" | "poll" | "storytelling";
     content: string;
+    threadTweets?: string[];
     estimatedEngagement: "high" | "medium";
     notes: string;
   }>;
