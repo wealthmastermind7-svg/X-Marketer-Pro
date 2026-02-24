@@ -285,14 +285,14 @@ export default function ScheduleScreen() {
           <View style={styles.agentCard}>
             <View style={styles.agentHeader}>
               <Feather name="cpu" size={16} color={Colors.gold} />
-              <Text style={styles.agentTitle}>KIMI AI AGENT</Text>
+              <Text style={styles.agentTitle}>X MARKETER ENGINE</Text>
             </View>
             <Text style={styles.agentId}>
-              Session: agent:main:subagent:673d...b4ab
+              AI-Powered Marketing Intelligence
             </Text>
             <View style={styles.agentStatus}>
               <View style={styles.agentDot} />
-              <Text style={styles.agentStatusText}>Connected via Moonshot API</Text>
+              <Text style={styles.agentStatusText}>Connected & Ready</Text>
             </View>
           </View>
         </Animated.View>
