@@ -9,10 +9,15 @@ import {
   Platform,
   RefreshControl,
   TextInput,
+  Image,
+  Alert,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import * as ImagePicker from "expo-image-picker";
+import * as DocumentPicker from "expo-document-picker";
+import * as FileSystem from "expo-file-system";
 import Animated, {
   FadeInDown,
   useAnimatedStyle,
@@ -40,6 +45,14 @@ const QUICK_CONTEXTS = [
   "Trending topics",
   "Indie hacker",
 ];
+
+interface Attachment {
+  uri: string;
+  base64: string;
+  mimeType: string;
+  name: string;
+  type: "image" | "file";
+}
 
 function PulseIndicator({ active }: { active: boolean }) {
   const opacity = useSharedValue(0.3);
@@ -87,22 +100,63 @@ function QuickChip({
         onPress();
       }}
     >
-      <View
-        style={[
-          styles.chip,
-          selected && styles.chipSelected,
-        ]}
-      >
-        <Text
-          style={[
-            styles.chipText,
-            selected && styles.chipTextSelected,
-          ]}
-        >
+      <View style={[styles.chip, selected && styles.chipSelected]}>
+        <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
           {label}
         </Text>
       </View>
     </Pressable>
+  );
+}
+
+function AttachmentButton({
+  icon,
+  label,
+  onPress,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        onPress();
+      }}
+      style={styles.attachButton}
+    >
+      <View style={styles.attachButtonInner}>
+        <Ionicons name={icon} size={22} color={Colors.gold} />
+        <Text style={styles.attachButtonLabel}>{label}</Text>
+      </View>
+    </Pressable>
+  );
+}
+
+function AttachmentPreview({
+  attachment,
+  onRemove,
+}: {
+  attachment: Attachment;
+  onRemove: () => void;
+}) {
+  return (
+    <View style={styles.attachPreview}>
+      {attachment.type === "image" ? (
+        <Image source={{ uri: attachment.uri }} style={styles.attachThumb} />
+      ) : (
+        <View style={styles.attachFileThumb}>
+          <Ionicons name="document-outline" size={20} color={Colors.gold} />
+        </View>
+      )}
+      <Text style={styles.attachName} numberOfLines={1}>
+        {attachment.name}
+      </Text>
+      <Pressable onPress={onRemove} style={styles.attachRemove}>
+        <Feather name="x" size={14} color={Colors.textDim} />
+      </Pressable>
+    </View>
   );
 }
 
@@ -114,6 +168,7 @@ export default function TodayScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [context, setContext] = useState("");
   const [showContext, setShowContext] = useState(true);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
   const buttonScale = useSharedValue(1);
 
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
@@ -135,19 +190,118 @@ export default function TodayScreen() {
     }
   };
 
+  const pickFromCamera = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permission needed", "Camera access is required to take photos.");
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      base64: true,
+      quality: 0.7,
+      allowsEditing: true,
+    });
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      if (asset.base64) {
+        setAttachments((prev) => [
+          ...prev,
+          {
+            uri: asset.uri,
+            base64: asset.base64!,
+            mimeType: asset.mimeType || "image/jpeg",
+            name: `Photo ${prev.length + 1}`,
+            type: "image",
+          },
+        ]);
+      }
+    }
+  };
+
+  const pickFromPhotos = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permission needed", "Photo library access is required.");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      base64: true,
+      quality: 0.7,
+      allowsMultipleSelection: true,
+      selectionLimit: 5,
+      mediaTypes: ["images"],
+    });
+    if (!result.canceled && result.assets.length > 0) {
+      const newAttachments: Attachment[] = result.assets
+        .filter((a) => a.base64)
+        .map((asset, i) => ({
+          uri: asset.uri,
+          base64: asset.base64!,
+          mimeType: asset.mimeType || "image/jpeg",
+          name: asset.fileName || `Image ${attachments.length + i + 1}`,
+          type: "image" as const,
+        }));
+      setAttachments((prev) => [...prev, ...newAttachments]);
+    }
+  };
+
+  const pickFromFiles = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ["image/*"],
+        multiple: true,
+      });
+      if (!result.canceled && result.assets.length > 0) {
+        const newAttachments: Attachment[] = [];
+        for (const asset of result.assets) {
+          try {
+            const base64 = await FileSystem.readAsStringAsync(asset.uri, {
+              encoding: FileSystem.EncodingType.Base64,
+            });
+            newAttachments.push({
+              uri: asset.uri,
+              base64,
+              mimeType: asset.mimeType || "image/jpeg",
+              name: asset.name || `File ${attachments.length + newAttachments.length + 1}`,
+              type: "image",
+            });
+          } catch {
+            // skip files that can't be read
+          }
+        }
+        if (newAttachments.length > 0) {
+          setAttachments((prev) => [...prev, ...newAttachments]);
+        }
+      }
+    } catch {
+      // user cancelled
+    }
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const generateReport = useCallback(async () => {
     setLoading(true);
     setError(null);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     try {
+      const images = attachments.map((a) => ({
+        base64: a.base64,
+        mimeType: a.mimeType,
+      }));
+
       const res = await apiRequest("POST", "/api/report/generate", {
         context: context.trim(),
+        images,
       });
       const data = await res.json();
 
       if (data.success && data.report) {
         data.report.context = context.trim() || undefined;
+        data.report.attachmentCount = attachments.length;
         setReport(data.report);
         await saveReport(data.report);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -161,7 +315,7 @@ export default function TodayScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [context]);
+  }, [context, attachments]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -233,7 +387,11 @@ export default function TodayScreen() {
               </Text>
             </View>
             <View style={styles.statusRight}>
-              <Ionicons name="timer-outline" size={14} color={Colors.textDim} />
+              <Ionicons
+                name="timer-outline"
+                size={14}
+                color={Colors.textDim}
+              />
               <Text style={styles.nextRun}>Next: {getNextRunTime()}</Text>
             </View>
           </View>
@@ -250,7 +408,9 @@ export default function TodayScreen() {
             <View style={styles.contextToggleLeft}>
               <Ionicons name="compass-outline" size={16} color={Colors.gold} />
               <Text style={styles.contextToggleText}>
-                {context ? `Focus: ${context}` : "Set your focus"}
+                {context || attachments.length > 0
+                  ? `Focus${attachments.length > 0 ? ` + ${attachments.length} file${attachments.length > 1 ? "s" : ""}` : ""}`
+                  : "Set your focus"}
               </Text>
             </View>
             <Feather
@@ -281,6 +441,7 @@ export default function TodayScreen() {
                   </Pressable>
                 )}
               </View>
+
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -295,6 +456,36 @@ export default function TodayScreen() {
                   />
                 ))}
               </ScrollView>
+
+              <View style={styles.attachRow}>
+                <AttachmentButton
+                  icon="camera-outline"
+                  label="Camera"
+                  onPress={pickFromCamera}
+                />
+                <AttachmentButton
+                  icon="images-outline"
+                  label="Photos"
+                  onPress={pickFromPhotos}
+                />
+                <AttachmentButton
+                  icon="folder-outline"
+                  label="Files"
+                  onPress={pickFromFiles}
+                />
+              </View>
+
+              {attachments.length > 0 && (
+                <View style={styles.attachList}>
+                  {attachments.map((att, i) => (
+                    <AttachmentPreview
+                      key={`${att.uri}-${i}`}
+                      attachment={att}
+                      onRemove={() => removeAttachment(i)}
+                    />
+                  ))}
+                </View>
+              )}
             </View>
           )}
         </Animated.View>
@@ -321,7 +512,9 @@ export default function TodayScreen() {
                 <View style={styles.loadingRow}>
                   <ActivityIndicator size="small" color={Colors.background} />
                   <Text style={styles.generateButtonText}>
-                    Analyzing X Trends...
+                    {attachments.length > 0
+                      ? "Analyzing Images & Trends..."
+                      : "Analyzing X Trends..."}
                   </Text>
                 </View>
               ) : (
@@ -363,16 +556,32 @@ export default function TodayScreen() {
                   minute: "2-digit",
                 })}
               </Text>
-              {(report as any).context && (
-                <View style={styles.contextTag}>
-                  <Ionicons
-                    name="compass-outline"
-                    size={12}
-                    color={Colors.gold}
-                  />
-                  <Text style={styles.contextTagText}>
-                    {(report as any).context}
-                  </Text>
+              {((report as any).context || (report as any).attachmentCount > 0) && (
+                <View style={styles.contextTagRow}>
+                  {(report as any).context && (
+                    <View style={styles.contextTag}>
+                      <Ionicons
+                        name="compass-outline"
+                        size={12}
+                        color={Colors.gold}
+                      />
+                      <Text style={styles.contextTagText}>
+                        {(report as any).context}
+                      </Text>
+                    </View>
+                  )}
+                  {(report as any).attachmentCount > 0 && (
+                    <View style={styles.contextTag}>
+                      <Ionicons
+                        name="attach-outline"
+                        size={12}
+                        color={Colors.gold}
+                      />
+                      <Text style={styles.contextTagText}>
+                        {(report as any).attachmentCount} file{(report as any).attachmentCount > 1 ? "s" : ""} analyzed
+                      </Text>
+                    </View>
+                  )}
                 </View>
               )}
             </View>
@@ -399,8 +608,8 @@ export default function TodayScreen() {
               />
               <Text style={styles.emptyTitle}>No Report Yet</Text>
               <Text style={styles.emptyDesc}>
-                Set your focus above, then tap "Run X Marketer Now" to generate
-                a tailored marketing intelligence report
+                Set your focus above, attach screenshots or files, then tap "Run
+                X Marketer Now" for a tailored marketing report
               </Text>
             </View>
           </Animated.View>
@@ -551,6 +760,66 @@ const styles = StyleSheet.create({
   chipTextSelected: {
     color: Colors.gold,
   },
+  attachRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 14,
+  },
+  attachButton: {
+    flex: 1,
+  },
+  attachButtonInner: {
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingVertical: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  attachButtonLabel: {
+    fontFamily: "DMSans_500Medium",
+    fontSize: 12,
+    color: Colors.creamMuted,
+  },
+  attachList: {
+    marginTop: 12,
+    gap: 8,
+  },
+  attachPreview: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: Colors.surface,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: 8,
+  },
+  attachThumb: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    backgroundColor: Colors.surface2,
+  },
+  attachFileThumb: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    backgroundColor: Colors.surface2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  attachName: {
+    flex: 1,
+    fontFamily: "DMSans_400Regular",
+    fontSize: 13,
+    color: Colors.cream,
+  },
+  attachRemove: {
+    padding: 6,
+  },
   generateButton: {
     backgroundColor: Colors.gold,
     borderRadius: 14,
@@ -605,6 +874,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Colors.textDim,
   },
+  contextTagRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 10,
+  },
   contextTag: {
     flexDirection: "row",
     alignItems: "center",
@@ -613,8 +888,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 8,
-    marginTop: 10,
-    alignSelf: "flex-start",
   },
   contextTagText: {
     fontFamily: "DMSans_500Medium",

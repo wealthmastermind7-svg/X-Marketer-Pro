@@ -35,9 +35,16 @@ Always provide:
 - 1 detailed growth tip
 - Content type analysis
 
-Make content specific, actionable, and tailored for maximum engagement. Be bold and creative with tweet ideas. Focus on current social media dynamics and growth hacking strategies.`;
+Make content specific, actionable, and tailored for maximum engagement. Be bold and creative with tweet ideas. Focus on current social media dynamics and growth hacking strategies.
 
-export async function generateDailyReport(context?: string): Promise<any> {
+If the user provides images (screenshots, app previews, marketing materials), analyze them carefully and incorporate visual insights into your recommendations. Reference what you see in the images when crafting tweet ideas and strategies.`;
+
+interface ImageAttachment {
+  base64: string;
+  mimeType: string;
+}
+
+export async function generateDailyReport(context?: string, images?: ImageAttachment[]): Promise<any> {
   const apiKey = process.env.MOONSHOT_API_KEY;
   if (!apiKey) {
     throw new Error("MOONSHOT_API_KEY is not configured");
@@ -50,16 +57,38 @@ export async function generateDailyReport(context?: string): Promise<any> {
     day: "numeric",
   });
 
-  let userMessage = `Generate today's daily X marketing report for ${today}. Analyze current Twitter/X trends, draft viral tweet ideas, suggest optimal posting times, and provide one powerful growth tip. Return valid JSON only.`;
+  let textMessage = `Generate today's daily X marketing report for ${today}. Analyze current Twitter/X trends, draft viral tweet ideas, suggest optimal posting times, and provide one powerful growth tip. Return valid JSON only.`;
 
   if (context && context.trim()) {
-    userMessage = `Generate today's daily X marketing report for ${today}.
+    textMessage = `Generate today's daily X marketing report for ${today}.
 
 USER'S FOCUS/CONTEXT: "${context.trim()}"
 
 IMPORTANT: Tailor ALL content (trends, tweet ideas, posting times, growth tips) specifically to the user's context above. The trends should be relevant to their niche. The tweet ideas should be crafted for their specific audience and goals. The growth tip should be actionable for their situation. Make everything hyper-relevant to what they're marketing or focused on.
 
 Return valid JSON only.`;
+  }
+
+  if (images && images.length > 0) {
+    textMessage += `\n\nThe user has attached ${images.length} image(s) for additional context. Analyze these images and incorporate what you see into your marketing recommendations, tweet ideas, and strategies. If they show an app, product, or brand, tailor the content specifically for that.`;
+  }
+
+  const hasImages = images && images.length > 0;
+  const model = hasImages ? "kimi-latest" : "kimi-latest";
+
+  let userContent: any;
+  if (hasImages) {
+    userContent = [
+      { type: "text", text: textMessage },
+      ...images.map((img) => ({
+        type: "image_url",
+        image_url: {
+          url: `data:${img.mimeType};base64,${img.base64}`,
+        },
+      })),
+    ];
+  } else {
+    userContent = textMessage;
   }
 
   const response = await fetch(`${MOONSHOT_BASE_URL}/chat/completions`, {
@@ -69,10 +98,10 @@ Return valid JSON only.`;
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: "kimi-latest",
+      model,
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: userMessage },
+        { role: "user", content: userContent },
       ],
       temperature: 0.8,
       max_tokens: 4000,

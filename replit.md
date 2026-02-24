@@ -14,6 +14,8 @@ A premium React Native (Expo) app that serves as a daily Twitter/X marketing int
 - Daily X/Twitter marketing intelligence reports
 - AI-powered trend analysis, tweet drafting, posting time suggestions
 - Growth tips and content analysis
+- User-defined focus/context for tailored reports (niche, app, subject)
+- Image & file attachments (Camera, Photos, Files) sent to Kimi vision for analysis
 - Report history with local persistence
 - Configurable cron schedule (daily at 9 AM default)
 - Connected to Kimi AI sub-agent via Moonshot API
@@ -58,6 +60,6 @@ server/
 
 ## API Endpoints
 
-- `POST /api/report/generate` - Generate a new daily report via Kimi AI
+- `POST /api/report/generate` - Generate a new daily report via Kimi AI (accepts `context` string + `images` array of base64 attachments)
 - `GET /api/report/today` - Get cached today's report
 - `GET /api/health` - Health check

@@ -9,7 +9,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/report/generate", async (req: Request, res: Response) => {
     try {
       const context = req.body?.context || "";
-      const report = await generateDailyReport(context);
+      const images = req.body?.images || [];
+      const report = await generateDailyReport(context, images);
       const dateKey = new Date().toISOString().split("T")[0];
       reportCache.set(dateKey, { report, timestamp: Date.now() });
       res.json({ success: true, report });
