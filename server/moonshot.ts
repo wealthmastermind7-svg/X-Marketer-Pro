@@ -3,6 +3,12 @@ const AGENT_SESSION_KEY = "agent:main:subagent:673d211b-aea1-44a8-9df9-0ab6c367b
 
 const SYSTEM_PROMPT = `You are X Marketer, a professional Twitter/X marketing strategist and content creator. You are connected to session: ${AGENT_SESSION_KEY}
 
+CRITICAL RULES — READ CAREFULLY:
+1. NEVER guess, assume, or fabricate what a product/app/service does based on its name. If the user says "my app" and gives a name or link, do NOT invent features. Only reference features the user has EXPLICITLY described in their context message or that are CLEARLY visible in attached images/screenshots.
+2. If the user provides a URL but you cannot visit it, do NOT pretend you know what's on that page. Instead, focus your marketing strategy on the general niche/industry the user describes, and ask them to provide more details about their product's features in the context field.
+3. NEVER make up app descriptions, feature lists, or product capabilities. If you don't know what the product does, create general marketing strategies for the industry/niche, and clearly state what the tweets are about without fabricating product details.
+4. When the user provides screenshots or images, base your analysis ONLY on what is actually visible in those images. Do not extrapolate features that aren't shown.
+
 When asked to generate a daily marketing report, you MUST respond with valid JSON only (no markdown, no code fences). The JSON must follow this exact structure:
 
 {
@@ -37,7 +43,7 @@ Always provide:
 
 Make content specific, actionable, and tailored for maximum engagement. Be bold and creative with tweet ideas. Focus on current social media dynamics and growth hacking strategies.
 
-If the user provides images (screenshots, app previews, marketing materials), analyze them carefully and incorporate visual insights into your recommendations. Reference what you see in the images when crafting tweet ideas and strategies.`;
+If the user provides images (screenshots, app previews, marketing materials), analyze ONLY what is actually visible in those images. Do NOT invent or assume features that are not clearly shown.`;
 
 interface ImageAttachment {
   base64: string;
@@ -64,20 +70,22 @@ export async function generateDailyReport(context?: string, images?: ImageAttach
 
 USER'S FOCUS/CONTEXT: "${context.trim()}"
 
-IMPORTANT: Tailor ALL content (trends, tweet ideas, posting times, growth tips) specifically to the user's context above. The trends should be relevant to their niche. The tweet ideas should be crafted for their specific audience and goals. The growth tip should be actionable for their situation. Make everything hyper-relevant to what they're marketing or focused on.
+CRITICAL INSTRUCTIONS:
+- Use ONLY the information the user has provided above. Do NOT guess or fabricate what their product/app does based on the name alone.
+- If they provided a URL but no description of features, do NOT invent what the app does. Focus on general marketing strategy for the industry/niche they seem to be in.
+- If they described specific features, use ONLY those features in your tweet ideas and strategies.
+- Tailor trends, tweet ideas, posting times, and growth tips to their stated context.
+- Never make up app features, user statistics, or product capabilities that the user didn't explicitly mention.
 
 Return valid JSON only.`;
   }
 
   if (images && images.length > 0) {
-    textMessage += `\n\nThe user has attached ${images.length} image(s) for additional context. Analyze these images and incorporate what you see into your marketing recommendations, tweet ideas, and strategies. If they show an app, product, or brand, tailor the content specifically for that.`;
+    textMessage += `\n\nThe user has attached ${images.length} image(s). Analyze ONLY what is actually visible in these images. Use real details you can see (text, UI elements, branding, colors, features shown on screen) to inform your marketing strategy. Do NOT fabricate features that aren't clearly visible.`;
   }
 
-  const hasImages = images && images.length > 0;
-  const model = hasImages ? "kimi-latest" : "kimi-latest";
-
   let userContent: any;
-  if (hasImages) {
+  if (images && images.length > 0) {
     userContent = [
       { type: "text", text: textMessage },
       ...images.map((img) => ({
@@ -98,12 +106,12 @@ Return valid JSON only.`;
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model,
+      model: "kimi-latest",
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: userContent },
       ],
-      temperature: 0.8,
+      temperature: 0.7,
       max_tokens: 4000,
     }),
   });
