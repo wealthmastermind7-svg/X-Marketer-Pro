@@ -1,14 +1,7 @@
 const MOONSHOT_BASE_URL = "https://api.moonshot.ai/v1";
+const MODEL_ID = "kimi-k2.5";
 
-const SYSTEM_PROMPT = `You are X Marketer, a professional Twitter/X marketing strategist and content creator.
-
-IMPORTANT RULES:
-1. You have access to web search via the $web_search tool. You MUST use it whenever you need real information.
-2. NEVER guess or fabricate what a product, app, or service does. If the user mentions any product, app, or website, you MUST search the web first to understand what it actually is.
-3. When the user provides URLs, you MUST search for and visit those URLs to gather accurate information before creating any marketing content.
-4. Base ALL tweet ideas, strategies, and recommendations on verified, real information only.
-
-When generating a daily marketing report, respond with valid JSON only (no markdown, no code fences). The JSON structure:
+const JSON_FORMAT_INSTRUCTION = `You MUST respond with valid JSON only (no markdown, no code fences, no extra text before or after the JSON). The JSON structure:
 
 {
   "reportDate": "YYYY-MM-DD",
@@ -38,9 +31,7 @@ Requirements:
 - For "thread" type ideas, populate "threadTweets" with 4-6 tweets (each under 280 chars). "content" = thread opener. For non-thread types, "threadTweets" = empty array
 - 3 optimal posting times with reasoning
 - 1 detailed growth tip
-- Content type analysis
-
-If the user provides images, analyze what is visible and combine with web search results.`;
+- Content type analysis`;
 
 interface ImageAttachment {
   base64: string;
@@ -61,11 +52,11 @@ function extractUrls(text: string): string[] {
   return [...new Set(matches)];
 }
 
-async function callMoonshotAPI(apiKey: string, messages: ChatMessage[]): Promise<any> {
+async function callAgentAPI(apiKey: string, messages: ChatMessage[]): Promise<any> {
   const body: any = {
-    model: "kimi-latest",
+    model: MODEL_ID,
     messages,
-    temperature: 0.7,
+    temperature: 1,
     max_tokens: 4000,
     tools: [
       {
@@ -88,26 +79,26 @@ async function callMoonshotAPI(apiKey: string, messages: ChatMessage[]): Promise
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error("API error:", response.status, errorText);
+    console.error("[X Marketer] API error:", response.status, errorText);
     throw new Error(`API error: ${response.status} - ${errorText}`);
   }
 
   return response.json();
 }
 
-async function runToolCallLoop(apiKey: string, messages: ChatMessage[]): Promise<string> {
+async function runAgentLoop(apiKey: string, messages: ChatMessage[]): Promise<string> {
   let iterations = 0;
   const maxIterations = 15;
 
   while (iterations < maxIterations) {
     iterations++;
-    console.log(`[X Marketer] API call #${iterations}, messages: ${messages.length}`);
+    console.log(`[X Marketer] Agent call #${iterations}, messages: ${messages.length}`);
 
-    const data = await callMoonshotAPI(apiKey, messages);
+    const data = await callAgentAPI(apiKey, messages);
     const choice = data.choices?.[0];
 
     if (!choice) {
-      throw new Error("No response from AI");
+      throw new Error("No response from agent");
     }
 
     const finishReason = choice.finish_reason;
@@ -132,9 +123,9 @@ async function runToolCallLoop(apiKey: string, messages: ChatMessage[]): Promise
     } else {
       const content = choice.message?.content;
       if (!content) {
-        throw new Error("No content in AI response");
+        throw new Error("No content in agent response");
       }
-      console.log(`[X Marketer] Completed after ${iterations} API calls`);
+      console.log(`[X Marketer] Completed after ${iterations} agent calls`);
       return content;
     }
   }
@@ -157,77 +148,39 @@ export async function generateDailyReport(context?: string, images?: ImageAttach
 
   const hasContext = !!(context && context.trim());
   const urls = hasContext ? extractUrls(context!) : [];
-  const hasUrls = urls.length > 0;
 
-  console.log(`[X Marketer] Generating report. Context: ${hasContext}, URLs found: ${urls.length}`);
+  console.log(`[X Marketer] Generating report via ${MODEL_ID}. Context: ${hasContext}, URLs: ${urls.length}`);
 
-  const messages: ChatMessage[] = [
-    { role: "system", content: SYSTEM_PROMPT },
-  ];
+  const messages: ChatMessage[] = [];
 
-  if (hasUrls) {
-    const researchPrompt = `I need to market this product. Here are the links:
-${urls.map((u) => `- ${u}`).join("\n")}
+  let prompt: string;
 
-${context!.trim()}
+  if (hasContext) {
+    prompt = `${context!.trim()}
 
-STEP 1: First, use web search to visit each of these URLs and research what this product/app actually does. Find out its real features, target audience, and value proposition. Also search for current Twitter/X trends related to this product's industry.
+Generate a complete daily X/Twitter marketing report for ${today}. Research the links and context I provided above, then deliver the report.
 
-STEP 2: After you have gathered real information from the web, generate a complete daily X marketing report for ${today} based on what you found. The report must be valid JSON only — no other text before or after the JSON.
-
-Remember: every tweet idea, trend, and strategy must be based on the REAL product information you found through web search. Do not make up features.`;
-
-    let userContent: any;
-    if (images && images.length > 0) {
-      userContent = [
-        { type: "text", text: researchPrompt + `\n\nThe user has also attached ${images.length} image(s) for additional context. Analyze them alongside your web search findings.` },
-        ...images.map((img) => ({
-          type: "image_url",
-          image_url: { url: `data:${img.mimeType};base64,${img.base64}` },
-        })),
-      ];
-    } else {
-      userContent = researchPrompt;
-    }
-
-    messages.push({ role: "user", content: userContent });
-  } else if (hasContext) {
-    let textMessage = `Generate today's daily X marketing report for ${today}.
-
-USER'S FOCUS: "${context!.trim()}"
-
-Search the web for current Twitter/X trends relevant to this focus area. Tailor ALL content specifically to what the user is focused on. Return valid JSON only.`;
-
-    if (images && images.length > 0) {
-      const userContent = [
-        { type: "text", text: textMessage + `\n\nThe user attached ${images.length} image(s). Analyze them for additional context.` },
-        ...images.map((img) => ({
-          type: "image_url",
-          image_url: { url: `data:${img.mimeType};base64,${img.base64}` },
-        })),
-      ];
-      messages.push({ role: "user", content: userContent });
-    } else {
-      messages.push({ role: "user", content: textMessage });
-    }
+${JSON_FORMAT_INSTRUCTION}`;
   } else {
-    let textMessage = `Generate today's daily X marketing report for ${today}. Search for the latest Twitter/X marketing trends, draft viral tweet ideas, suggest optimal posting times, and provide one powerful growth tip. Return valid JSON only.`;
+    prompt = `Generate today's daily X/Twitter marketing report for ${today}. Research the latest trends, draft viral tweet ideas, suggest optimal posting times, and provide a growth tip.
 
-    if (images && images.length > 0) {
-      const userContent = [
-        { type: "text", text: textMessage + `\n\nThe user attached ${images.length} image(s). Analyze them for additional context.` },
-        ...images.map((img) => ({
-          type: "image_url",
-          image_url: { url: `data:${img.mimeType};base64,${img.base64}` },
-        })),
-      ];
-      messages.push({ role: "user", content: userContent });
-    } else {
-      messages.push({ role: "user", content: textMessage });
-    }
+${JSON_FORMAT_INSTRUCTION}`;
   }
 
-  const rawContent = await runToolCallLoop(apiKey, messages);
+  if (images && images.length > 0) {
+    const userContent: any[] = [
+      { type: "text", text: prompt + `\n\nI've attached ${images.length} image(s) for additional context. Analyze them alongside your research.` },
+      ...images.map((img) => ({
+        type: "image_url",
+        image_url: { url: `data:${img.mimeType};base64,${img.base64}` },
+      })),
+    ];
+    messages.push({ role: "user", content: userContent });
+  } else {
+    messages.push({ role: "user", content: prompt });
+  }
+
+  const rawContent = await runAgentLoop(apiKey, messages);
 
   let cleaned = rawContent.trim();
   if (cleaned.startsWith("```json")) {

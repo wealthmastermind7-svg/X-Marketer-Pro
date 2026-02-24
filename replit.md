@@ -6,7 +6,7 @@ A premium React Native (Expo) app that serves as a daily Twitter/X marketing int
 
 - **Frontend**: Expo Router with file-based routing, React Native
 - **Backend**: Express server on port 5000
-- **AI**: Moonshot API (Kimi) with `$web_search` tool calling for live web research + marketing reports
+- **AI**: Moonshot API `kimi-k2.5` model with `$web_search` tool calling for live web research + marketing reports
 - **Storage**: AsyncStorage for local report persistence
 
 ## Key Features
@@ -18,8 +18,9 @@ A premium React Native (Expo) app that serves as a daily Twitter/X marketing int
 - Image & file attachments (Camera, Photos, Files) sent to Kimi vision for analysis
 - Report history with local persistence
 - Configurable cron schedule (daily at 9 AM default)
-- Kimi Claw (web search) enabled — AI can visit App Store links, websites, and research products in real-time before generating content
-- Multi-turn tool calling loop handles Kimi's `$web_search` builtin_function automatically
+- Web search enabled via `$web_search` builtin — AI can visit App Store links, websites, and research products in real-time
+- Multi-turn tool calling loop handles web research automatically (up to 15 iterations)
+- Model: `kimi-k2.5` (requires temperature=1), connected via Moonshot API at api.moonshot.ai
 
 ## Project Structure
 
