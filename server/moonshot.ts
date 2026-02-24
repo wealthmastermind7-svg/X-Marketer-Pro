@@ -37,7 +37,7 @@ Always provide:
 
 Make content specific, actionable, and tailored for maximum engagement. Be bold and creative with tweet ideas. Focus on current social media dynamics and growth hacking strategies.`;
 
-export async function generateDailyReport(): Promise<any> {
+export async function generateDailyReport(context?: string): Promise<any> {
   const apiKey = process.env.MOONSHOT_API_KEY;
   if (!apiKey) {
     throw new Error("MOONSHOT_API_KEY is not configured");
@@ -50,6 +50,18 @@ export async function generateDailyReport(): Promise<any> {
     day: "numeric",
   });
 
+  let userMessage = `Generate today's daily X marketing report for ${today}. Analyze current Twitter/X trends, draft viral tweet ideas, suggest optimal posting times, and provide one powerful growth tip. Return valid JSON only.`;
+
+  if (context && context.trim()) {
+    userMessage = `Generate today's daily X marketing report for ${today}.
+
+USER'S FOCUS/CONTEXT: "${context.trim()}"
+
+IMPORTANT: Tailor ALL content (trends, tweet ideas, posting times, growth tips) specifically to the user's context above. The trends should be relevant to their niche. The tweet ideas should be crafted for their specific audience and goals. The growth tip should be actionable for their situation. Make everything hyper-relevant to what they're marketing or focused on.
+
+Return valid JSON only.`;
+  }
+
   const response = await fetch(`${MOONSHOT_BASE_URL}/chat/completions`, {
     method: "POST",
     headers: {
@@ -60,10 +72,7 @@ export async function generateDailyReport(): Promise<any> {
       model: "kimi-latest",
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
-        {
-          role: "user",
-          content: `Generate today's daily X marketing report for ${today}. Analyze current Twitter/X trends, draft viral tweet ideas, suggest optimal posting times, and provide one powerful growth tip. Return valid JSON only.`,
-        },
+        { role: "user", content: userMessage },
       ],
       temperature: 0.8,
       max_tokens: 4000,

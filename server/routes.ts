@@ -6,9 +6,10 @@ const reportCache: Map<string, { report: any; timestamp: number }> = new Map();
 const CACHE_TTL = 30 * 60 * 1000;
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  app.post("/api/report/generate", async (_req: Request, res: Response) => {
+  app.post("/api/report/generate", async (req: Request, res: Response) => {
     try {
-      const report = await generateDailyReport();
+      const context = req.body?.context || "";
+      const report = await generateDailyReport(context);
       const dateKey = new Date().toISOString().split("T")[0];
       reportCache.set(dateKey, { report, timestamp: Date.now() });
       res.json({ success: true, report });

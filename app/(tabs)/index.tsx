@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Platform,
   RefreshControl,
+  TextInput,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, Feather } from "@expo/vector-icons";
@@ -30,6 +31,15 @@ import {
   GrowthTipSection,
   ContentAnalysisSection,
 } from "@/components/ReportCard";
+
+const QUICK_CONTEXTS = [
+  "iOS app marketing",
+  "AI / tech niche",
+  "SaaS growth",
+  "Personal brand",
+  "Trending topics",
+  "Indie hacker",
+];
 
 function PulseIndicator({ active }: { active: boolean }) {
   const opacity = useSharedValue(0.3);
@@ -61,12 +71,49 @@ function PulseIndicator({ active }: { active: boolean }) {
   );
 }
 
+function QuickChip({
+  label,
+  selected,
+  onPress,
+}: {
+  label: string;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        onPress();
+      }}
+    >
+      <View
+        style={[
+          styles.chip,
+          selected && styles.chipSelected,
+        ]}
+      >
+        <Text
+          style={[
+            styles.chipText,
+            selected && styles.chipTextSelected,
+          ]}
+        >
+          {label}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
 export default function TodayScreen() {
   const insets = useSafeAreaInsets();
   const [report, setReport] = useState<DailyReport | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [context, setContext] = useState("");
+  const [showContext, setShowContext] = useState(true);
   const buttonScale = useSharedValue(1);
 
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
@@ -94,10 +141,13 @@ export default function TodayScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     try {
-      const res = await apiRequest("POST", "/api/report/generate");
+      const res = await apiRequest("POST", "/api/report/generate", {
+        context: context.trim(),
+      });
       const data = await res.json();
 
       if (data.success && data.report) {
+        data.report.context = context.trim() || undefined;
         setReport(data.report);
         await saveReport(data.report);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -111,12 +161,20 @@ export default function TodayScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [context]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     generateReport();
   }, [generateReport]);
+
+  const handleQuickChip = (label: string) => {
+    if (context === label) {
+      setContext("");
+    } else {
+      setContext(label);
+    }
+  };
 
   const getNextRunTime = () => {
     const now = new Date();
@@ -146,6 +204,8 @@ export default function TodayScreen() {
           { paddingBottom: Platform.OS === "web" ? 114 : 100 },
         ]}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -177,6 +237,66 @@ export default function TodayScreen() {
               <Text style={styles.nextRun}>Next: {getNextRunTime()}</Text>
             </View>
           </View>
+        </Animated.View>
+
+        <Animated.View entering={FadeInDown.delay(250).duration(600)}>
+          <Pressable
+            onPress={() => {
+              setShowContext(!showContext);
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            }}
+            style={styles.contextToggle}
+          >
+            <View style={styles.contextToggleLeft}>
+              <Ionicons name="compass-outline" size={16} color={Colors.gold} />
+              <Text style={styles.contextToggleText}>
+                {context ? `Focus: ${context}` : "Set your focus"}
+              </Text>
+            </View>
+            <Feather
+              name={showContext ? "chevron-up" : "chevron-down"}
+              size={16}
+              color={Colors.textDim}
+            />
+          </Pressable>
+
+          {showContext && (
+            <View style={styles.contextSection}>
+              <View style={styles.contextInputWrap}>
+                <TextInput
+                  style={styles.contextInput}
+                  placeholder="e.g. Marketing my iOS fitness app to Gen Z..."
+                  placeholderTextColor={Colors.textDim}
+                  value={context}
+                  onChangeText={setContext}
+                  multiline
+                  maxLength={200}
+                />
+                {context.length > 0 && (
+                  <Pressable
+                    onPress={() => setContext("")}
+                    style={styles.clearBtn}
+                  >
+                    <Feather name="x" size={14} color={Colors.textDim} />
+                  </Pressable>
+                )}
+              </View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.chipsRow}
+              >
+                {QUICK_CONTEXTS.map((label) => (
+                  <QuickChip
+                    key={label}
+                    label={label}
+                    selected={context === label}
+                    onPress={() => handleQuickChip(label)}
+                  />
+                ))}
+              </ScrollView>
+            </View>
+          )}
         </Animated.View>
 
         <Animated.View entering={FadeInDown.delay(300).duration(600)}>
@@ -243,6 +363,18 @@ export default function TodayScreen() {
                   minute: "2-digit",
                 })}
               </Text>
+              {(report as any).context && (
+                <View style={styles.contextTag}>
+                  <Ionicons
+                    name="compass-outline"
+                    size={12}
+                    color={Colors.gold}
+                  />
+                  <Text style={styles.contextTagText}>
+                    {(report as any).context}
+                  </Text>
+                </View>
+              )}
             </View>
 
             {report.trends && <TrendsSection trends={report.trends} />}
@@ -267,8 +399,8 @@ export default function TodayScreen() {
               />
               <Text style={styles.emptyTitle}>No Report Yet</Text>
               <Text style={styles.emptyDesc}>
-                Tap "Run X Marketer Now" to generate today's marketing
-                intelligence report powered by Kimi AI
+                Set your focus above, then tap "Run X Marketer Now" to generate
+                a tailored marketing intelligence report
               </Text>
             </View>
           </Animated.View>
@@ -325,7 +457,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    marginBottom: 16,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: Colors.border,
   },
@@ -348,6 +480,76 @@ const styles = StyleSheet.create({
     fontFamily: "DMSans_400Regular",
     fontSize: 12,
     color: Colors.textDim,
+  },
+  contextToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+    marginBottom: 4,
+  },
+  contextToggleLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  contextToggleText: {
+    fontFamily: "DMSans_500Medium",
+    fontSize: 14,
+    color: Colors.cream,
+  },
+  contextSection: {
+    marginBottom: 16,
+  },
+  contextInputWrap: {
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    paddingRight: 8,
+  },
+  contextInput: {
+    flex: 1,
+    fontFamily: "DMSans_400Regular",
+    fontSize: 14,
+    color: Colors.cream,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    minHeight: 44,
+    maxHeight: 80,
+  },
+  clearBtn: {
+    paddingTop: 14,
+    paddingHorizontal: 6,
+  },
+  chipsRow: {
+    flexDirection: "row",
+    gap: 8,
+    paddingTop: 10,
+    paddingBottom: 2,
+  },
+  chip: {
+    backgroundColor: Colors.surface,
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  chipSelected: {
+    backgroundColor: Colors.goldDim,
+    borderColor: Colors.gold,
+  },
+  chipText: {
+    fontFamily: "DMSans_500Medium",
+    fontSize: 13,
+    color: Colors.creamMuted,
+  },
+  chipTextSelected: {
+    color: Colors.gold,
   },
   generateButton: {
     backgroundColor: Colors.gold,
@@ -402,6 +604,22 @@ const styles = StyleSheet.create({
     fontFamily: "DMSans_400Regular",
     fontSize: 13,
     color: Colors.textDim,
+  },
+  contextTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: Colors.goldDim,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    marginTop: 10,
+    alignSelf: "flex-start",
+  },
+  contextTagText: {
+    fontFamily: "DMSans_500Medium",
+    fontSize: 12,
+    color: Colors.gold,
   },
   emptyState: {
     alignItems: "center",
