@@ -227,22 +227,20 @@ function setupErrorHandler(app: express.Application) {
 }
 
 (async () => {
-  setupCors(app);
-  setupBodyParsing(app);
-
   app.get("/health", (_req: Request, res: Response) => {
     res.status(200).send("ok");
   });
 
   app.get("/", (req: Request, res: Response, next: NextFunction) => {
     const platform = req.header("expo-platform");
+    if (platform) return next();
     const accept = req.header("accept") || "";
-    if (!platform && !accept.includes("text/html")) {
-      return res.status(200).send("ok");
-    }
-    next();
+    if (accept.includes("text/html")) return next();
+    return res.status(200).send("ok");
   });
 
+  setupCors(app);
+  setupBodyParsing(app);
   setupRequestLogging(app);
 
   configureExpoAndLanding(app);
