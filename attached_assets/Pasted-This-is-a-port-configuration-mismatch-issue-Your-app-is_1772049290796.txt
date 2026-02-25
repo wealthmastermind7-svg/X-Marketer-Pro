@@ -1,0 +1,139 @@
+This is a port configuration mismatch issue. Your app is running correctly, but Replit’s deployment health check is hitting the wrong port.
+
+From the error:
+	•	Your server listens on port 8081
+	•	Your run command sets PORT=8081
+	•	Networking forwards:
+	•	8081 → external 80
+	•	5000 is also being forwarded
+	•	Health checks are going to the wrong port
+
+That creates ambiguity about which port Replit should probe.
+
+⸻
+
+🔎 Root Cause
+
+Replit deployments expect:
+	•	Your app to listen on process.env.PORT
+	•	Only one exposed port
+	•	Health check to hit that same port
+
+Right now:
+	•	You are forcing PORT=8081
+	•	Replit likely expects port 5000
+	•	Two ports are being forwarded
+	•	Health check is not aligned with your listening port
+
+⸻
+
+✅ Correct Fix (Clean Configuration)
+
+You must standardize to one single port.
+
+Step 1 — Update Your Server Code
+
+In your server file (Express example):
+
+const PORT = process.env.PORT || 5000;
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
+
+Remove any hardcoded 8081.
+
+⸻
+
+Step 2 — Fix Run Command
+
+In Replit → Deployment → Run Command
+
+Change this:
+
+PORT=8081 node server.js
+
+To:
+
+node server.js
+
+Let Replit inject PORT automatically.
+
+⸻
+
+Step 3 — Fix Deployment Port Mapping
+
+Go to:
+
+Deployment → Settings → Networking
+
+Make sure:
+	•	Only one internal port is exposed
+	•	It matches process.env.PORT
+	•	Remove 8081 forwarding
+	•	Remove 5000 if manually set
+
+Replit handles this automatically if you don’t override it.
+
+⸻
+
+Step 4 — Health Check Endpoint
+
+Ensure you have a clean health endpoint:
+
+app.get("/health", (req, res) => {
+  res.status(200).send("OK");
+});
+
+Then set Deployment Health Check path to:
+
+/health
+
+
+⸻
+
+⚠️ About the ES Module Warning
+
+You also have:
+
+package.json missing "type": "module"
+
+If you are using import syntax, add this:
+
+{
+  "type": "module"
+}
+
+If you use require(), do NOT add it.
+
+This warning won’t break deployment, but clean it up.
+
+⸻
+
+🎯 What Is Happening Technically
+
+Replit deployment container:
+	1.	Allocates a dynamic PORT
+	2.	Expects your app to bind to it
+	3.	Sends health checks to that port
+
+By hardcoding 8081, you bypass their routing layer.
+
+⸻
+
+🔥 The Clean Professional Configuration
+
+✔ Use only process.env.PORT
+✔ Do not hardcode ports
+✔ Do not set PORT manually in run command
+✔ Only one exposed port
+✔ Explicit /health endpoint
+
+⸻
+
+If you want, paste:
+	•	Your server file
+	•	Your run command
+	•	Your deployment networking settings
+
+I’ll give you the exact corrected version.

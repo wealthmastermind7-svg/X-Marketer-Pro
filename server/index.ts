@@ -232,10 +232,10 @@ function setupErrorHandler(app: express.Application) {
   });
 
   app.get("/", (req: Request, res: Response, next: NextFunction) => {
+    const ua = req.header("user-agent") || "";
     const platform = req.header("expo-platform");
     if (platform) return next();
-    const accept = req.header("accept") || "";
-    if (accept.includes("text/html")) return next();
+    if (ua.includes("Mozilla") || ua.includes("Chrome") || ua.includes("Safari")) return next();
     return res.status(200).send("ok");
   });
 
