@@ -1,0 +1,185 @@
+Good. Now the port issue is resolved.
+
+You are now failing for only one reason:
+
+Health checks are failing on /
+
+The message confirms:
+	•	App is listening on 8081 ✔
+	•	Port mapping is correct ✔
+	•	Health checks on / are not returning 200 fast enough ❌
+
+This is no longer a networking problem.
+
+This is a response-time problem.
+
+⸻
+
+🔴 What Is Actually Happening
+
+Replit health checks:
+
+• Hit GET /
+• Expect HTTP 200
+• Expect it very quickly
+• No heavy middleware
+• No DB connection delay
+• No HTML rendering delay
+
+If /:
+	•	Loads landing page
+	•	Runs Expo handler
+	•	Connects to database
+	•	Loads assets
+	•	Runs async logic
+
+It fails.
+
+Even 1–2 seconds can be too slow.
+
+⸻
+
+✅ The Only Safe Fix
+
+You must make / return immediately.
+
+Not conditionally.
+Not based on user-agent.
+Not based on Accept header.
+
+Always.
+
+Then move your landing page to another route.
+
+⸻
+
+🧠 Correct Architecture
+
+Do this:
+
+1️⃣ Make root fast and dumb
+
+Put this at the VERY TOP of your server file:
+
+app.get("/", (req, res) => {
+  res.status(200).send("ok");
+});
+
+No middleware before it.
+No async.
+No database.
+No next().
+No detection.
+
+Instant response.
+
+⸻
+
+2️⃣ Move landing page to another route
+
+For example:
+
+app.get("/app", (req, res) => {
+  // your landing page logic here
+});
+
+Or whatever route Expo uses.
+
+⸻
+
+🚫 Why Your Smart Middleware Failed
+
+Your user-agent detection still:
+
+• Runs logic
+• Runs string checks
+• Calls next()
+• Triggers downstream handlers
+
+That adds delay.
+
+Health check timeout is aggressive.
+
+You must eliminate all branching.
+
+⸻
+
+⚠️ Important
+
+Health check does NOT use /health.
+
+It uses /.
+
+So /health is irrelevant unless configured manually in Deployment settings.
+
+You can change health check path to /health in deployment settings if available.
+If you do that, then:
+
+app.get("/health", (req, res) => res.send("ok"));
+
+And / can be whatever you want.
+
+That is actually the cleaner approach if Replit allows it.
+
+⸻
+
+🔵 Secondary Warning
+
+You also have:
+
+package.json missing "type": "module"
+
+If you are using import syntax, add:
+
+{
+  "type": "module"
+}
+
+This is not causing the health failure.
+But fix it.
+
+⸻
+
+🎯 What You Should Do Right Now
+
+Choose ONE:
+
+Option A (Fastest Fix)
+
+Make / always return "ok".
+
+Publish.
+
+Done.
+
+⸻
+
+Option B (Cleaner)
+
+Change Deployment → Health Check Path to /health
+Add instant /health route.
+Leave / alone.
+
+Publish.
+
+⸻
+
+🧠 Why It Keeps Failing
+
+Because you’re trying to preserve the landing page at /.
+
+Health checks don’t care about your landing page.
+
+They only care about uptime.
+
+⸻
+
+You are now past port configuration issues.
+
+This is purely about making / return 200 in under a few milliseconds.
+
+Make it dumb.
+Publish.
+It will pass.
+
+If it still fails after making / unconditional, paste your first 50 lines of server/index.ts and I will pinpoint the exact delay.
