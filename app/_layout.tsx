@@ -1,5 +1,5 @@
 import { QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import { Slot, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -15,10 +15,27 @@ import { Colors } from "@/constants/colors";
 
 SplashScreen.preventAutoHideAsync();
 
-function RootLayoutNav() {
+function AuthGate() {
   const { user, loading } = useAuth();
+  const segments = useSegments();
+  const router = useRouter();
 
-  if (loading) {
+  useEffect(() => {
+    if (loading) return;
+
+    const inAuthScreen = segments[0] === "auth";
+
+    if (!user && !inAuthScreen) {
+      router.replace("/auth");
+    } else if (user && inAuthScreen) {
+      router.replace("/(tabs)");
+    }
+  }, [user, loading, segments]);
+
+  const inAuthScreen = segments[0] === "auth";
+  const shouldShowLoading = loading || (!user && !inAuthScreen) || (user && inAuthScreen);
+
+  if (shouldShowLoading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={Colors.gold} />
@@ -26,15 +43,7 @@ function RootLayoutNav() {
     );
   }
 
-  return (
-    <Stack screenOptions={{ headerShown: false }}>
-      {user ? (
-        <Stack.Screen name="(tabs)" />
-      ) : (
-        <Stack.Screen name="auth" />
-      )}
-    </Stack>
-  );
+  return <Slot />;
 }
 
 export default function RootLayout() {
@@ -61,7 +70,7 @@ export default function RootLayout() {
           <GestureHandlerRootView style={{ flex: 1 }}>
             <KeyboardProvider>
               <StatusBar style="light" />
-              <RootLayoutNav />
+              <AuthGate />
             </KeyboardProvider>
           </GestureHandlerRootView>
         </AuthProvider>

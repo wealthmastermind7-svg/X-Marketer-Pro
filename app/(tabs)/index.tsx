@@ -310,7 +310,12 @@ export default function TodayScreen() {
         throw new Error(data.error || "Failed to generate report");
       }
     } catch (err: any) {
-      setError(err.message || "Connection failed. Check your network.");
+      const msg = err.message || "";
+      if (msg.includes("401")) {
+        setError("Please sign in to generate reports.");
+      } else {
+        setError(msg || "Connection failed. Check your network.");
+      }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setLoading(false);
