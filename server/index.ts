@@ -230,10 +230,15 @@ function setupErrorHandler(app: express.Application) {
   setupCors(app);
   setupBodyParsing(app);
 
+  app.get("/health", (_req: Request, res: Response) => {
+    res.status(200).send("ok");
+  });
+
   app.get("/", (req: Request, res: Response, next: NextFunction) => {
     const platform = req.header("expo-platform");
-    if (!platform && !req.header("accept")?.includes("text/html")) {
-      return res.status(200).json({ status: "ok" });
+    const accept = req.header("accept") || "";
+    if (!platform && !accept.includes("text/html")) {
+      return res.status(200).send("ok");
     }
     next();
   });
