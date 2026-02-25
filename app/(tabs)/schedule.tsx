@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -7,13 +7,22 @@ import {
   Pressable,
   Switch,
   Platform,
+  ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { Colors } from "@/constants/colors";
-import { getSchedule, saveSchedule, type ScheduleConfig } from "@/lib/storage";
+import { apiRequest } from "@/lib/query-client";
+import { useAuth } from "@/lib/auth-context";
+
+interface ScheduleConfig {
+  enabled: boolean;
+  hour: number;
+  minute: number;
+  context: string | null;
+}
 
 function SettingRow({
   icon,
@@ -55,12 +64,14 @@ function SettingRow({
 
 export default function ScheduleScreen() {
   const insets = useSafeAreaInsets();
+  const { user, logout } = useAuth();
   const [config, setConfig] = useState<ScheduleConfig>({
-    enabled: true,
+    enabled: false,
     hour: 9,
     minute: 0,
-    notifications: true,
+    context: null,
   });
+  const [loading, setLoading] = useState(true);
 
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
 
@@ -69,15 +80,32 @@ export default function ScheduleScreen() {
   }, []);
 
   const loadConfig = async () => {
-    const saved = await getSchedule();
-    setConfig(saved);
+    try {
+      const res = await apiRequest("GET", "/api/schedule");
+      const data = await res.json();
+      if (data.success && data.schedule) {
+        setConfig({
+          enabled: data.schedule.enabled,
+          hour: data.schedule.hour,
+          minute: data.schedule.minute,
+          context: data.schedule.context,
+        });
+      }
+    } catch {
+    } finally {
+      setLoading(false);
+    }
   };
 
   const updateConfig = async (updates: Partial<ScheduleConfig>) => {
     const newConfig = { ...config, ...updates };
     setConfig(newConfig);
-    await saveSchedule(newConfig);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      await apiRequest("PUT", "/api/schedule", newConfig);
+    } catch (err) {
+      console.error("Failed to save schedule:", err);
+    }
   };
 
   const formatTime = (hour: number, minute: number) => {
@@ -98,6 +126,11 @@ export default function ScheduleScreen() {
       month: "short",
       day: "numeric",
     });
+  };
+
+  const handleLogout = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    await logout();
   };
 
   const tasks = [
@@ -127,6 +160,14 @@ export default function ScheduleScreen() {
       color: "#E88B6C",
     },
   ];
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { paddingTop: topPadding, justifyContent: "center", alignItems: "center" }]}>
+        <ActivityIndicator size="large" color={Colors.gold} />
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { paddingTop: topPadding }]}>
@@ -216,32 +257,6 @@ export default function ScheduleScreen() {
             <View style={styles.divider} />
 
             <SettingRow
-              icon="notifications-outline"
-              iconColor="#B67CE8"
-              label="Notifications"
-              value={
-                config.notifications
-                  ? "Enabled"
-                  : "Disabled"
-              }
-              trailing={
-                <Switch
-                  value={config.notifications}
-                  onValueChange={(v) => updateConfig({ notifications: v })}
-                  trackColor={{
-                    false: Colors.surface2,
-                    true: Colors.goldDim,
-                  }}
-                  thumbColor={
-                    config.notifications ? Colors.gold : Colors.textDim
-                  }
-                />
-              }
-            />
-
-            <View style={styles.divider} />
-
-            <SettingRow
               icon="hourglass-outline"
               iconColor="#E88B6C"
               label="Timeout"
@@ -294,6 +309,23 @@ export default function ScheduleScreen() {
               <View style={styles.agentDot} />
               <Text style={styles.agentStatusText}>Connected & Ready</Text>
             </View>
+          </View>
+        </Animated.View>
+
+        <Animated.View entering={FadeInDown.delay(500).duration(600)}>
+          <View style={styles.accountCard}>
+            <View style={styles.accountHeader}>
+              <Ionicons name="person-circle-outline" size={18} color={Colors.gold} />
+              <Text style={styles.cardTitle}>ACCOUNT</Text>
+            </View>
+            <View style={styles.accountInfo}>
+              <Text style={styles.accountName}>{user?.displayName}</Text>
+              <Text style={styles.accountEmail}>{user?.email}</Text>
+            </View>
+            <Pressable onPress={handleLogout} style={styles.logoutBtn}>
+              <Feather name="log-out" size={16} color="#E85D4A" />
+              <Text style={styles.logoutText}>Sign Out</Text>
+            </Pressable>
           </View>
         </Animated.View>
       </ScrollView>
@@ -454,5 +486,46 @@ const styles = StyleSheet.create({
     fontFamily: "DMSans_500Medium",
     fontSize: 13,
     color: Colors.success,
+  },
+  accountCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 18,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  accountHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 14,
+  },
+  accountInfo: {
+    marginBottom: 16,
+  },
+  accountName: {
+    fontFamily: "DMSans_600SemiBold",
+    fontSize: 16,
+    color: Colors.cream,
+    marginBottom: 2,
+  },
+  accountEmail: {
+    fontFamily: "DMSans_400Regular",
+    fontSize: 13,
+    color: Colors.textDim,
+  },
+  logoutBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  logoutText: {
+    fontFamily: "DMSans_500Medium",
+    fontSize: 14,
+    color: "#E85D4A",
   },
 });

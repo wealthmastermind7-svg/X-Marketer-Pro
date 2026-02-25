@@ -28,7 +28,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { Colors } from "@/constants/colors";
 import { apiRequest } from "@/lib/query-client";
-import { saveReport, getReports, type DailyReport } from "@/lib/storage";
+import type { DailyReport } from "@/lib/storage";
 import {
   TrendsSection,
   TweetIdeasSection,
@@ -182,11 +182,13 @@ export default function TodayScreen() {
   }, []);
 
   const loadCachedReport = async () => {
-    const reports = await getReports();
-    const today = new Date().toISOString().split("T")[0];
-    const todayReport = reports.find((r) => r.reportDate === today);
-    if (todayReport) {
-      setReport(todayReport);
+    try {
+      const res = await apiRequest("GET", "/api/report/today");
+      const data = await res.json();
+      if (data.success && data.report) {
+        setReport(data.report);
+      }
+    } catch {
     }
   };
 
@@ -303,7 +305,6 @@ export default function TodayScreen() {
         data.report.context = context.trim() || undefined;
         data.report.attachmentCount = attachments.length;
         setReport(data.report);
-        await saveReport(data.report);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } else {
         throw new Error(data.error || "Failed to generate report");

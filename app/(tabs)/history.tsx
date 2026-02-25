@@ -6,14 +6,16 @@ import {
   FlatList,
   Pressable,
   Platform,
+  ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useFocusEffect, router } from "expo-router";
+import { useFocusEffect } from "expo-router";
 import { Ionicons, Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { Colors } from "@/constants/colors";
-import { getReports, type DailyReport } from "@/lib/storage";
+import { apiRequest } from "@/lib/query-client";
+import type { DailyReport } from "@/lib/storage";
 
 function HistoryItem({
   report,
@@ -79,6 +81,7 @@ function HistoryItem({
 export default function HistoryScreen() {
   const insets = useSafeAreaInsets();
   const [reports, setReports] = useState<DailyReport[]>([]);
+  const [loading, setLoading] = useState(false);
 
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
 
@@ -89,8 +92,19 @@ export default function HistoryScreen() {
   );
 
   const loadReports = async () => {
-    const data = await getReports();
-    setReports(data);
+    setLoading(true);
+    try {
+      const res = await apiRequest("GET", "/api/reports/history");
+      const data = await res.json();
+      if (data.success && data.reports) {
+        setReports(data.reports);
+      }
+    } catch (err) {
+      console.log("Failed to load history from server, using empty list");
+      setReports([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -102,32 +116,38 @@ export default function HistoryScreen() {
         </Text>
       </View>
 
-      <FlatList
-        data={reports}
-        keyExtractor={(item) => item.reportDate}
-        renderItem={({ item, index }) => (
-          <HistoryItem report={item} index={index} />
-        )}
-        contentContainerStyle={[
-          styles.listContent,
-          { paddingBottom: Platform.OS === "web" ? 114 : 100 },
-        ]}
-        showsVerticalScrollIndicator={false}
-        scrollEnabled={!!reports.length}
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Ionicons
-              name="time-outline"
-              size={48}
-              color={Colors.textDim}
-            />
-            <Text style={styles.emptyTitle}>No Reports Yet</Text>
-            <Text style={styles.emptyDesc}>
-              Generated reports will appear here. Go to Today and run your first report.
-            </Text>
-          </View>
-        }
-      />
+      {loading && reports.length === 0 ? (
+        <View style={styles.emptyState}>
+          <ActivityIndicator size="large" color={Colors.gold} />
+        </View>
+      ) : (
+        <FlatList
+          data={reports}
+          keyExtractor={(item, index) => `${item.reportDate}-${index}`}
+          renderItem={({ item, index }) => (
+            <HistoryItem report={item} index={index} />
+          )}
+          contentContainerStyle={[
+            styles.listContent,
+            { paddingBottom: Platform.OS === "web" ? 114 : 100 },
+          ]}
+          showsVerticalScrollIndicator={false}
+          scrollEnabled={!!reports.length}
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <Ionicons
+                name="time-outline"
+                size={48}
+                color={Colors.textDim}
+              />
+              <Text style={styles.emptyTitle}>No Reports Yet</Text>
+              <Text style={styles.emptyDesc}>
+                Generated reports will appear here. Go to Today and run your first report.
+              </Text>
+            </View>
+          }
+        />
+      )}
     </View>
   );
 }
