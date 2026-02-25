@@ -6,6 +6,19 @@ export function getApiUrl(): string {
   let host = process.env.EXPO_PUBLIC_DOMAIN;
 
   if (!host) {
+    host = process.env.REPLIT_DEV_DOMAIN
+      ? `${process.env.REPLIT_DEV_DOMAIN}:5000`
+      : undefined;
+  }
+
+  if (!host) {
+    const domains = process.env.REPLIT_DOMAINS;
+    if (domains) {
+      host = domains.split(",")[0].trim();
+    }
+  }
+
+  if (!host) {
     throw new Error("EXPO_PUBLIC_DOMAIN is not set");
   }
 
