@@ -231,6 +231,15 @@ function setupErrorHandler(app: express.Application) {
     res.status(200).send("ok");
   });
 
+  app.use("/", (req: Request, res: Response, next: NextFunction) => {
+    if (req.method !== "GET" || req.path !== "/") return next();
+    const platform = req.header("expo-platform");
+    if (platform) return next();
+    const accept = req.header("accept") || "";
+    if (accept.includes("text/html")) return next();
+    res.status(200).send("ok");
+  });
+
   setupCors(app);
   setupBodyParsing(app);
   setupRequestLogging(app);
