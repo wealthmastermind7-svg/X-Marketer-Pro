@@ -6,6 +6,7 @@ import { db } from "./db";
 import { reports } from "../shared/schema";
 import { eq, desc } from "drizzle-orm";
 import { initScheduler, getUserSchedule, updateUserSchedule } from "./scheduler";
+import { postTweet, postThread, verifyCredentials } from "./twitter";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   registerAuthRoutes(app);
@@ -100,6 +101,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Schedule update error:", error);
       res.status(500).json({ success: false, error: "Failed to update schedule" });
+    }
+  });
+
+  app.post("/api/tweet/post", authMiddleware, async (req: AuthRequest, res: Response) => {
+    try {
+      const { content, threadTweets, type } = req.body;
+
+      if (!content || typeof content !== "string") {
+        return res.status(400).json({ success: false, error: "Tweet content is required" });
+      }
+
+      if (type === "thread" && threadTweets && Array.isArray(threadTweets) && threadTweets.length > 0) {
+        const allTweets = [content, ...threadTweets];
+        const result = await postThread(allTweets);
+        return res.json({
+          success: true,
+          tweetId: result.ids[0],
+          threadIds: result.ids,
+          url: `https://x.com/i/status/${result.ids[0]}`,
+        });
+      }
+
+      const result = await postTweet(content);
+      res.json({
+        success: true,
+        tweetId: result.id,
+        url: `https://x.com/i/status/${result.id}`,
+      });
+    } catch (error: any) {
+      console.error("Tweet post error:", error);
+      const message = error?.data?.detail || error?.message || "Failed to post tweet";
+      res.status(500).json({ success: false, error: message });
+    }
+  });
+
+  app.get("/api/tweet/verify", authMiddleware, async (_req: AuthRequest, res: Response) => {
+    try {
+      const user = await verifyCredentials();
+      res.json({ success: true, ...user });
+    } catch (error: any) {
+      console.error("Twitter verify error:", error);
+      res.status(500).json({ success: false, error: "Failed to verify X credentials" });
     }
   });
 

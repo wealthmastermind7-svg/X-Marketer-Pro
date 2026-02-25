@@ -1,5 +1,5 @@
-import React from "react";
-import { View, Text, StyleSheet, Pressable } from "react-native";
+import React, { useState } from "react";
+import { View, Text, StyleSheet, Pressable, Alert, ActivityIndicator, Linking } from "react-native";
 import { Ionicons, Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import Animated, {
@@ -10,6 +10,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { Colors } from "@/constants/colors";
 import type { DailyReport } from "@/lib/storage";
+import { apiRequest } from "@/lib/query-client";
 
 function MomentumBadge({ momentum }: { momentum: string }) {
   const color =
@@ -88,19 +89,62 @@ function ThreadTweetItem({ tweet, num }: { tweet: string; num: number }) {
 function TweetIdeaItem({
   idea,
   index,
+  onPostSuccess,
 }: {
   idea: DailyReport["tweetIdeas"][0];
   index: number;
+  onPostSuccess?: (url: string) => void;
 }) {
   const scale = useSharedValue(1);
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
+  const [posting, setPosting] = useState(false);
+  const [posted, setPosted] = useState<string | null>(null);
 
   const isThread =
     idea.type === "thread" &&
     idea.threadTweets &&
     idea.threadTweets.length > 0;
+
+  const handlePost = async () => {
+    const label = isThread ? "this thread" : "this tweet";
+    Alert.alert(
+      "Post to X",
+      `Are you sure you want to post ${label} to your X account?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Post",
+          style: "default",
+          onPress: async () => {
+            setPosting(true);
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            try {
+              const res = await apiRequest("POST", "/api/tweet/post", {
+                content: idea.content,
+                threadTweets: isThread ? idea.threadTweets : undefined,
+                type: idea.type,
+              });
+              const data = await res.json();
+              if (data.success) {
+                setPosted(data.url);
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                onPostSuccess?.(data.url);
+              } else {
+                throw new Error(data.error);
+              }
+            } catch (err: any) {
+              Alert.alert("Post Failed", err.message || "Could not post to X. Try again.");
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+            } finally {
+              setPosting(false);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   return (
     <Animated.View
@@ -187,6 +231,33 @@ function TweetIdeaItem({
           )}
 
           <Text style={styles.tweetNotes}>{idea.notes}</Text>
+
+          {posted ? (
+            <Pressable
+              style={styles.postedButton}
+              onPress={() => Linking.openURL(posted)}
+            >
+              <Ionicons name="checkmark-circle" size={16} color="#4CAF7C" />
+              <Text style={styles.postedText}>Posted — View on X</Text>
+            </Pressable>
+          ) : (
+            <Pressable
+              style={[styles.postButton, posting && styles.postButtonDisabled]}
+              onPress={handlePost}
+              disabled={posting}
+            >
+              {posting ? (
+                <ActivityIndicator size="small" color={Colors.background} />
+              ) : (
+                <>
+                  <Ionicons name="send" size={14} color={Colors.background} />
+                  <Text style={styles.postButtonText}>
+                    {isThread ? "Post Thread to X" : "Post to X"}
+                  </Text>
+                </>
+              )}
+            </Pressable>
+          )}
         </View>
       </Pressable>
     </Animated.View>
@@ -489,6 +560,41 @@ const styles = StyleSheet.create({
     color: Colors.creamMuted,
     fontStyle: "italic",
     lineHeight: 17,
+  },
+  postButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: Colors.gold,
+    borderRadius: 10,
+    paddingVertical: 10,
+    marginTop: 12,
+  },
+  postButtonDisabled: {
+    opacity: 0.6,
+  },
+  postButtonText: {
+    fontFamily: "DMSans_700Bold",
+    fontSize: 13,
+    color: Colors.background,
+  },
+  postedButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: "rgba(76, 175, 124, 0.1)",
+    borderRadius: 10,
+    paddingVertical: 10,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: "rgba(76, 175, 124, 0.2)",
+  },
+  postedText: {
+    fontFamily: "DMSans_600SemiBold",
+    fontSize: 13,
+    color: "#4CAF7C",
   },
   timeItem: {
     backgroundColor: Colors.surface,

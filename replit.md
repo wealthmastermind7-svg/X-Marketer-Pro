@@ -54,6 +54,7 @@ server/
   auth.ts                  - JWT auth middleware + register/login routes
   db.ts                    - PostgreSQL database connection (Drizzle + Neon)
   moonshot.ts              - Moonshot/Kimi AI API integration
+  twitter.ts               - X/Twitter API integration (post tweets/threads)
   scheduler.ts             - node-cron scheduler for daily report generation
 drizzle.config.ts          - Drizzle Kit configuration
 ```
@@ -72,6 +73,10 @@ drizzle.config.ts          - Drizzle Kit configuration
 - `MOONSHOT_API_KEY` - Moonshot API key for Kimi AI access (secret)
 - `SESSION_SECRET` - JWT signing secret (secret)
 - `DATABASE_URL` - PostgreSQL connection string (auto-provisioned)
+- `X_API_KEY` - X/Twitter API Consumer Key (secret)
+- `X_API_SECRET` - X/Twitter API Consumer Secret (secret)
+- `X_ACCESS_TOKEN` - X/Twitter Access Token (secret)
+- `X_ACCESS_TOKEN_SECRET` - X/Twitter Access Token Secret (secret)
 - `EXPO_PUBLIC_DOMAIN` - Set at dev time via npm script (dev only)
 
 ## API URL Resolution (TestFlight/Production)
@@ -99,6 +104,10 @@ The app resolves the backend API URL in this priority order:
 ### Schedule (all require auth)
 - `GET /api/schedule` - Get user's schedule config
 - `PUT /api/schedule` - Update schedule (enabled, hour, minute, context)
+
+### X/Twitter Posting (all require auth)
+- `POST /api/tweet/post` - Post a tweet or thread to X (content, threadTweets, type)
+- `GET /api/tweet/verify` - Verify X API credentials and get username
 
 ### Other
 - `GET /api/health` - Health check
