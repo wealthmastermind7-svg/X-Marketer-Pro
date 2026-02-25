@@ -178,7 +178,7 @@ function configureExpoAndLanding(app: express.Application) {
       return next();
     }
 
-    if (req.path !== "/app" && req.path !== "/manifest") {
+    if (req.path !== "/" && req.path !== "/manifest") {
       return next();
     }
 
@@ -187,7 +187,7 @@ function configureExpoAndLanding(app: express.Application) {
       return serveExpoManifest(platform, res);
     }
 
-    if (req.path === "/app") {
+    if (req.path === "/") {
       return serveLandingPage({
         req,
         res,
@@ -227,14 +227,6 @@ function setupErrorHandler(app: express.Application) {
 }
 
 (async () => {
-  app.get("/", (_req: Request, res: Response) => {
-    res.status(200).send("ok");
-  });
-
-  app.get("/health", (_req: Request, res: Response) => {
-    res.status(200).send("ok");
-  });
-
   setupCors(app);
   setupBodyParsing(app);
   setupRequestLogging(app);
@@ -242,6 +234,10 @@ function setupErrorHandler(app: express.Application) {
   configureExpoAndLanding(app);
 
   const server = await registerRoutes(app);
+
+  app.get("/health", (_req: Request, res: Response) => {
+    res.status(200).send("ok");
+  });
 
   setupErrorHandler(app);
 

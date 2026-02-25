@@ -750,14 +750,14 @@ function configureExpoAndLanding(app2) {
     if (req.path.startsWith("/api")) {
       return next();
     }
-    if (req.path !== "/app" && req.path !== "/manifest") {
+    if (req.path !== "/" && req.path !== "/manifest") {
       return next();
     }
     const platform = req.header("expo-platform");
     if (platform && (platform === "ios" || platform === "android")) {
       return serveExpoManifest(platform, res);
     }
-    if (req.path === "/app") {
+    if (req.path === "/") {
       return serveLandingPage({
         req,
         res,
@@ -784,17 +784,14 @@ function setupErrorHandler(app2) {
   });
 }
 (async () => {
-  app.get("/", (_req, res) => {
-    res.status(200).send("ok");
-  });
-  app.get("/health", (_req, res) => {
-    res.status(200).send("ok");
-  });
   setupCors(app);
   setupBodyParsing(app);
   setupRequestLogging(app);
   configureExpoAndLanding(app);
   const server = await registerRoutes(app);
+  app.get("/health", (_req, res) => {
+    res.status(200).send("ok");
+  });
   setupErrorHandler(app);
   const port = parseInt(process.env.PORT || "5000", 10);
   server.listen(

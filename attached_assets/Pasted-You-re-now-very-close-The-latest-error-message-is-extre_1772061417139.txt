@@ -1,0 +1,142 @@
+You’re now very close. The latest error message is extremely important:
+
+> Health check fails because the `/` endpoint returns "ok" **before `configureExpoAndLanding()` middleware is registered**, preventing proper routing.
+
+That tells us this is no longer about:
+
+* ❌ Port mismatch
+* ❌ Wrong PORT value
+* ❌ Module format
+* ❌ Startup speed
+
+It’s about **Express route ordering and middleware lifecycle**.
+
+---
+
+# 🎯 What Is Actually Happening
+
+You currently have:
+
+```ts
+app.get("/", (req, res) => {
+  res.status(200).send("ok");
+});
+
+configureExpoAndLanding(app);
+```
+
+So:
+
+1. Health check hits `/`
+2. Express matches the first `/`
+3. Returns `"ok"`
+4. Expo landing middleware never runs
+5. Replit detects routing inconsistency or misconfigured middleware
+6. Promotion fails
+
+Replit now expects the full routing stack to be initialized before responding.
+
+---
+
+# 🔥 The Correct Architecture
+
+You must:
+
+1. Initialize all middleware first
+2. Then define the health check route
+3. Ensure health check does not interfere with landing routes
+
+---
+
+# ✅ Proper Order
+
+Your `server/index.ts` should look like this:
+
+```ts
+// 1️⃣ Create app
+const app = express();
+
+// 2️⃣ Register ALL middleware first
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+await configureExpoAndLanding(app);
+
+// 3️⃣ Then define health endpoint
+app.get("/health", (req, res) => {
+  res.status(200).send("ok");
+});
+
+// 4️⃣ Then define fallback root handler LAST
+app.get("/", (req, res) => {
+  res.status(200).send("ok");
+});
+
+// 5️⃣ Start server
+app.listen(process.env.PORT);
+```
+
+---
+
+# 💡 Even Better (Cleaner)
+
+Instead of overriding `/`, configure the health check path in Deployment settings to:
+
+```
+/health
+```
+
+Then:
+
+```ts
+app.get("/health", (req, res) => {
+  res.status(200).send("ok");
+});
+```
+
+And leave `/` completely untouched for Expo.
+
+That is the professional solution.
+
+---
+
+# 🧠 Why This Matters
+
+Replit promotion phase verifies:
+
+* Middleware loads correctly
+* Routes resolve properly
+* Health endpoint does not short-circuit the routing stack
+* App is stable after full initialization
+
+By placing `/` first, you short-circuited the routing graph.
+
+---
+
+# 🔎 About the CJS Change
+
+Switching from ESM → CJS:
+
+✔ Removes reparsing warning
+✔ Slightly improves startup
+✔ Good cleanup
+
+But it was not the root cause.
+
+---
+
+# 🎯 Final Checklist
+
+Make sure:
+
+* `PORT=8081` in deployment run command
+* `app.listen(process.env.PORT)`
+* `configureExpoAndLanding(app)` runs before health route
+* Health route is defined AFTER middleware
+* Or change health check path to `/health`
+
+---
+
+If you paste the first ~80 lines of `server/index.ts`, I’ll tell you the exact correct ordering in one pass.
+
+You’re within one structural fix of this publishing successfully.
