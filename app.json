@@ -42,6 +42,9 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "apiUrl": "https://57dce37d-7e5f-4469-ada3-9776f99b6d10-00-2plu0dfynd5gq.janeway.replit.dev"
     }
   }
 }

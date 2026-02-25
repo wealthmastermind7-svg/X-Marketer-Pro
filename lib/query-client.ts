@@ -1,9 +1,20 @@
 import { fetch } from "expo/fetch";
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import Constants from "expo-constants";
 import { currentToken } from "./auth-context";
 
 export function getApiUrl(): string {
   let host = process.env.EXPO_PUBLIC_DOMAIN;
+
+  if (host) {
+    let url = new URL(`https://${host}`);
+    return url.href;
+  }
+
+  const extraApiUrl = Constants.expoConfig?.extra?.apiUrl;
+  if (extraApiUrl) {
+    return extraApiUrl.endsWith("/") ? extraApiUrl : `${extraApiUrl}/`;
+  }
 
   if (!host) {
     host = process.env.REPLIT_DEV_DOMAIN
@@ -19,11 +30,10 @@ export function getApiUrl(): string {
   }
 
   if (!host) {
-    throw new Error("EXPO_PUBLIC_DOMAIN is not set");
+    throw new Error("Unable to determine API URL. Set apiUrl in app.json extra.");
   }
 
   let url = new URL(`https://${host}`);
-
   return url.href;
 }
 

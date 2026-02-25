@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
-import { apiRequest } from "./query-client";
+import Constants from "expo-constants";
 
 const TOKEN_KEY = "xmarketer_token";
 
@@ -47,6 +47,32 @@ async function removeStoredToken() {
 }
 
 export let currentToken: string | null = null;
+
+function getBaseUrl(): string {
+  let host = process.env.EXPO_PUBLIC_DOMAIN;
+  if (host) {
+    return `https://${host}`;
+  }
+
+  const extraApiUrl = Constants.expoConfig?.extra?.apiUrl;
+  if (extraApiUrl) {
+    return extraApiUrl.endsWith("/") ? extraApiUrl.slice(0, -1) : extraApiUrl;
+  }
+
+  host = process.env.REPLIT_DEV_DOMAIN
+    ? `${process.env.REPLIT_DEV_DOMAIN}:5000`
+    : undefined;
+  if (host) {
+    return `https://${host}`;
+  }
+
+  const domains = process.env.REPLIT_DOMAINS;
+  if (domains) {
+    return `https://${domains.split(",")[0].trim()}`;
+  }
+
+  throw new Error("Unable to determine API URL");
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -129,21 +155,4 @@ export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth must be used within AuthProvider");
   return ctx;
-}
-
-function getBaseUrl(): string {
-  let host = process.env.EXPO_PUBLIC_DOMAIN;
-  if (!host) {
-    host = process.env.REPLIT_DEV_DOMAIN
-      ? `${process.env.REPLIT_DEV_DOMAIN}:5000`
-      : undefined;
-  }
-  if (!host) {
-    const domains = process.env.REPLIT_DOMAINS;
-    if (domains) {
-      host = domains.split(",")[0].trim();
-    }
-  }
-  if (!host) throw new Error("Unable to determine API URL");
-  return `https://${host}`;
 }
