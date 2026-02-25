@@ -229,6 +229,15 @@ function setupErrorHandler(app: express.Application) {
 (async () => {
   setupCors(app);
   setupBodyParsing(app);
+
+  app.get("/", (req: Request, res: Response, next: NextFunction) => {
+    const platform = req.header("expo-platform");
+    if (!platform && !req.header("accept")?.includes("text/html")) {
+      return res.status(200).json({ status: "ok" });
+    }
+    next();
+  });
+
   setupRequestLogging(app);
 
   configureExpoAndLanding(app);
