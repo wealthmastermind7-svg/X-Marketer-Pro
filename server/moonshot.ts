@@ -105,7 +105,15 @@ async function runAgentLoop(apiKey: string, messages: ChatMessage[]): Promise<st
 
     if (finishReason === "tool_calls" && choice.message?.tool_calls) {
       console.log(`[X Marketer] Web search triggered (${choice.message.tool_calls.length} calls)`);
-      messages.push(choice.message);
+      const assistantMsg: any = {
+        role: "assistant",
+        content: choice.message.content || "",
+        tool_calls: choice.message.tool_calls,
+      };
+      if (choice.message.reasoning_content !== undefined) {
+        assistantMsg.reasoning_content = choice.message.reasoning_content;
+      }
+      messages.push(assistantMsg);
 
       for (const toolCall of choice.message.tool_calls) {
         const toolCallName = toolCall.function.name;
