@@ -285,6 +285,16 @@ export default function TodayScreen() {
   };
 
   const generateReport = useCallback(async () => {
+    if (!context.trim()) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      Alert.alert(
+        "Set Your Focus",
+        "Tell X Marketer what to research. Tap a quick-start tag or type your niche, product, or topic above.",
+        [{ text: "Got it", style: "default" }]
+      );
+      return;
+    }
+
     setLoading(true);
     setError(null);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);

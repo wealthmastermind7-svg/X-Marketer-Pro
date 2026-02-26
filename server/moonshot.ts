@@ -58,6 +58,7 @@ async function callAgentAPI(apiKey: string, messages: ChatMessage[]): Promise<an
     messages,
     temperature: 1,
     max_tokens: 4000,
+    thinking: { type: "disabled" },
     tools: [
       {
         type: "builtin_function",
