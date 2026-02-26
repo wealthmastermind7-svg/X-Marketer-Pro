@@ -90,10 +90,12 @@ function TweetIdeaItem({
   idea,
   index,
   onPostSuccess,
+  twitterConnected = true,
 }: {
   idea: DailyReport["tweetIdeas"][0];
   index: number;
   onPostSuccess?: (url: string) => void;
+  twitterConnected?: boolean;
 }) {
   const scale = useSharedValue(1);
   const animatedStyle = useAnimatedStyle(() => ({
@@ -240,7 +242,7 @@ function TweetIdeaItem({
               <Ionicons name="checkmark-circle" size={16} color="#4CAF7C" />
               <Text style={styles.postedText}>Posted — View on X</Text>
             </Pressable>
-          ) : (
+          ) : twitterConnected ? (
             <Pressable
               style={[styles.postButton, posting && styles.postButtonDisabled]}
               onPress={handlePost}
@@ -257,6 +259,11 @@ function TweetIdeaItem({
                 </>
               )}
             </Pressable>
+          ) : (
+            <View style={styles.connectHint}>
+              <Ionicons name="link-outline" size={14} color={Colors.textDim} />
+              <Text style={styles.connectHintText}>Connect X to post</Text>
+            </View>
           )}
         </View>
       </Pressable>
@@ -300,8 +307,10 @@ export function TrendsSection({ trends }: { trends: DailyReport["trends"] }) {
 
 export function TweetIdeasSection({
   ideas,
+  twitterConnected = true,
 }: {
   ideas: DailyReport["tweetIdeas"];
+  twitterConnected?: boolean;
 }) {
   return (
     <View style={styles.section}>
@@ -313,7 +322,7 @@ export function TweetIdeasSection({
         </View>
       </View>
       {ideas.map((idea, i) => (
-        <TweetIdeaItem key={i} idea={idea} index={i} />
+        <TweetIdeaItem key={i} idea={idea} index={i} twitterConnected={twitterConnected} />
       ))}
     </View>
   );
@@ -595,6 +604,23 @@ const styles = StyleSheet.create({
     fontFamily: "DMSans_600SemiBold",
     fontSize: 13,
     color: "#4CAF7C",
+  },
+  connectHint: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 10,
+    marginTop: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderStyle: "dashed",
+  },
+  connectHintText: {
+    fontFamily: "DMSans_500Medium",
+    fontSize: 13,
+    color: Colors.textDim,
   },
   timeItem: {
     backgroundColor: Colors.surface,

@@ -14,6 +14,9 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   displayName: text("display_name").notNull(),
   defaultContext: text("default_context"),
+  twitterAccessToken: text("twitter_access_token"),
+  twitterAccessSecret: text("twitter_access_secret"),
+  twitterUsername: text("twitter_username"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

@@ -169,6 +169,7 @@ export default function TodayScreen() {
   const [context, setContext] = useState("");
   const [showContext, setShowContext] = useState(true);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [twitterConnected, setTwitterConnected] = useState(false);
   const buttonScale = useSharedValue(1);
 
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
@@ -179,7 +180,16 @@ export default function TodayScreen() {
 
   useEffect(() => {
     loadCachedReport();
+    loadTwitterStatus();
   }, []);
+
+  const loadTwitterStatus = async () => {
+    try {
+      const res = await apiRequest("GET", "/api/twitter/status");
+      const data = await res.json();
+      if (data.success) setTwitterConnected(data.connected);
+    } catch {}
+  };
 
   const loadCachedReport = async () => {
     try {
@@ -604,7 +614,7 @@ export default function TodayScreen() {
 
             {report.trends && <TrendsSection trends={report.trends} />}
             {report.tweetIdeas && (
-              <TweetIdeasSection ideas={report.tweetIdeas} />
+              <TweetIdeasSection ideas={report.tweetIdeas} twitterConnected={twitterConnected} />
             )}
             {report.postingTimes && (
               <PostingTimesSection times={report.postingTimes} />

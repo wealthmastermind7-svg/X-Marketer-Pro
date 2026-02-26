@@ -1,33 +1,80 @@
 import { TwitterApi } from "twitter-api-v2";
 
-function getClient(): TwitterApi {
-  const apiKey = process.env.X_API_KEY;
-  const apiSecret = process.env.X_API_SECRET;
-  const accessToken = process.env.X_ACCESS_TOKEN;
-  const accessTokenSecret = process.env.X_ACCESS_TOKEN_SECRET;
+export interface TwitterCredentials {
+  accessToken: string;
+  accessSecret: string;
+}
 
-  if (!apiKey || !apiSecret || !accessToken || !accessTokenSecret) {
-    throw new Error("X/Twitter API credentials not configured");
+const oauthTokenStore = new Map<string, { secret: string; createdAt: number }>();
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, val] of oauthTokenStore.entries()) {
+    if (now - val.createdAt > 10 * 60 * 1000) {
+      oauthTokenStore.delete(key);
+    }
   }
+}, 60 * 1000);
 
+function getAppCredentials() {
+  const appKey = process.env.X_API_KEY;
+  const appSecret = process.env.X_API_SECRET;
+  if (!appKey || !appSecret) {
+    throw new Error("X API app credentials not configured");
+  }
+  return { appKey, appSecret };
+}
+
+function getUserClient(creds: TwitterCredentials): TwitterApi {
+  const { appKey, appSecret } = getAppCredentials();
   return new TwitterApi({
-    appKey: apiKey,
-    appSecret: apiSecret,
-    accessToken,
-    accessSecret: accessTokenSecret,
+    appKey,
+    appSecret,
+    accessToken: creds.accessToken,
+    accessSecret: creds.accessSecret,
   });
 }
 
-export async function postTweet(content: string): Promise<{ id: string; text: string }> {
-  const client = getClient();
+export async function getOAuthRequestToken(callbackUrl: string): Promise<{ url: string; oauthToken: string }> {
+  const { appKey, appSecret } = getAppCredentials();
+  const client = new TwitterApi({ appKey, appSecret });
+  const authLink = await client.generateAuthLink(callbackUrl, { linkMode: "authorize" });
+  oauthTokenStore.set(authLink.oauth_token, { secret: authLink.oauth_token_secret, createdAt: Date.now() });
+  return { url: authLink.url, oauthToken: authLink.oauth_token };
+}
+
+export async function handleOAuthCallback(
+  oauthToken: string,
+  oauthVerifier: string
+): Promise<{ accessToken: string; accessSecret: string; username: string }> {
+  const stored = oauthTokenStore.get(oauthToken);
+  if (!stored) {
+    throw new Error("OAuth session expired. Please try connecting again.");
+  }
+  oauthTokenStore.delete(oauthToken);
+
+  const { appKey, appSecret } = getAppCredentials();
+  const tempClient = new TwitterApi({
+    appKey,
+    appSecret,
+    accessToken: oauthToken,
+    accessSecret: stored.secret,
+  });
+
+  const { accessToken, accessSecret, screenName } = await tempClient.login(oauthVerifier);
+  return { accessToken, accessSecret, username: screenName };
+}
+
+export async function postTweet(content: string, creds: TwitterCredentials): Promise<{ id: string; text: string }> {
+  const client = getUserClient(creds);
   const result = await client.v2.tweet(content);
   return { id: result.data.id, text: result.data.text };
 }
 
-export async function postThread(tweets: string[]): Promise<{ ids: string[]; texts: string[] }> {
+export async function postThread(tweets: string[], creds: TwitterCredentials): Promise<{ ids: string[]; texts: string[] }> {
   if (tweets.length === 0) throw new Error("Thread must have at least one tweet");
 
-  const client = getClient();
+  const client = getUserClient(creds);
   const ids: string[] = [];
   const texts: string[] = [];
 
@@ -47,8 +94,8 @@ export async function postThread(tweets: string[]): Promise<{ ids: string[]; tex
   return { ids, texts };
 }
 
-export async function verifyCredentials(): Promise<{ username: string; name: string }> {
-  const client = getClient();
+export async function verifyUserCredentials(creds: TwitterCredentials): Promise<{ username: string; name: string }> {
+  const client = getUserClient(creds);
   const me = await client.v2.me();
   return { username: me.data.username, name: me.data.name };
 }

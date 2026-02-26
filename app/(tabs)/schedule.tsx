@@ -8,6 +8,8 @@ import {
   Switch,
   Platform,
   ActivityIndicator,
+  Alert,
+  Linking,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, Feather, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -72,12 +74,65 @@ export default function ScheduleScreen() {
     context: null,
   });
   const [loading, setLoading] = useState(true);
+  const [twitterStatus, setTwitterStatus] = useState<{ connected: boolean; username?: string }>({ connected: false });
+  const [connectingTwitter, setConnectingTwitter] = useState(false);
 
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
 
   useEffect(() => {
     loadConfig();
+    loadTwitterStatus();
   }, []);
+
+  const loadTwitterStatus = async () => {
+    try {
+      const res = await apiRequest("GET", "/api/twitter/status");
+      const data = await res.json();
+      if (data.success) {
+        setTwitterStatus({ connected: data.connected, username: data.username });
+      }
+    } catch {}
+  };
+
+  const connectTwitter = async () => {
+    setConnectingTwitter(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      const res = await apiRequest("GET", "/api/twitter/connect");
+      const data = await res.json();
+      if (data.success && data.url) {
+        await Linking.openURL(data.url);
+        setTimeout(() => loadTwitterStatus(), 5000);
+      } else {
+        Alert.alert("Connection Failed", data.error || "Could not start X connection.");
+      }
+    } catch (err: any) {
+      Alert.alert("Connection Failed", err.message || "Could not connect to X.");
+    } finally {
+      setConnectingTwitter(false);
+    }
+  };
+
+  const disconnectTwitter = () => {
+    Alert.alert(
+      "Disconnect X Account",
+      `Remove @${twitterStatus.username} from your account? You won't be able to post tweets until you reconnect.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Disconnect",
+          style: "destructive",
+          onPress: async () => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            try {
+              await apiRequest("DELETE", "/api/twitter/disconnect");
+              setTwitterStatus({ connected: false });
+            } catch {}
+          },
+        },
+      ]
+    );
+  };
 
   const loadConfig = async () => {
     try {
@@ -312,7 +367,59 @@ export default function ScheduleScreen() {
           </View>
         </Animated.View>
 
-        <Animated.View entering={FadeInDown.delay(500).duration(600)}>
+        <Animated.View entering={FadeInDown.delay(450).duration(600)}>
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Ionicons name="logo-twitter" size={18} color={Colors.gold} />
+              <Text style={styles.cardTitle}>X ACCOUNT</Text>
+              {twitterStatus.connected && (
+                <View style={[styles.statusPill, { backgroundColor: "rgba(76, 175, 124, 0.12)" }]}>
+                  <Text style={[styles.statusText, { color: "#4CAF7C" }]}>LINKED</Text>
+                </View>
+              )}
+            </View>
+
+            {twitterStatus.connected ? (
+              <>
+                <View style={styles.twitterConnected}>
+                  <View style={styles.twitterUserRow}>
+                    <Ionicons name="checkmark-circle" size={20} color="#4CAF7C" />
+                    <View>
+                      <Text style={styles.twitterUsername}>@{twitterStatus.username}</Text>
+                      <Text style={styles.twitterHint}>Tweets will post to this account</Text>
+                    </View>
+                  </View>
+                </View>
+                <Pressable onPress={disconnectTwitter} style={styles.disconnectBtn}>
+                  <Feather name="x-circle" size={16} color="#E85D4A" />
+                  <Text style={styles.disconnectText}>Disconnect</Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <Text style={styles.twitterDesc}>
+                  Link your X account to post tweets directly from your reports.
+                </Text>
+                <Pressable
+                  onPress={connectTwitter}
+                  disabled={connectingTwitter}
+                  style={[styles.connectBtn, connectingTwitter && { opacity: 0.6 }]}
+                >
+                  {connectingTwitter ? (
+                    <ActivityIndicator size="small" color={Colors.background} />
+                  ) : (
+                    <>
+                      <Ionicons name="link" size={16} color={Colors.background} />
+                      <Text style={styles.connectBtnText}>Connect X Account</Text>
+                    </>
+                  )}
+                </Pressable>
+              </>
+            )}
+          </View>
+        </Animated.View>
+
+        <Animated.View entering={FadeInDown.delay(550).duration(600)}>
           <View style={styles.accountCard}>
             <View style={styles.accountHeader}>
               <Ionicons name="person-circle-outline" size={18} color={Colors.gold} />
@@ -524,6 +631,59 @@ const styles = StyleSheet.create({
     borderTopColor: Colors.border,
   },
   logoutText: {
+    fontFamily: "DMSans_500Medium",
+    fontSize: 14,
+    color: "#E85D4A",
+  },
+  twitterConnected: {
+    marginBottom: 12,
+  },
+  twitterUserRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  twitterUsername: {
+    fontFamily: "DMSans_600SemiBold",
+    fontSize: 16,
+    color: Colors.cream,
+  },
+  twitterHint: {
+    fontFamily: "DMSans_400Regular",
+    fontSize: 12,
+    color: Colors.textDim,
+    marginTop: 2,
+  },
+  twitterDesc: {
+    fontFamily: "DMSans_400Regular",
+    fontSize: 14,
+    color: Colors.creamMuted,
+    lineHeight: 20,
+    marginBottom: 14,
+  },
+  connectBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: Colors.gold,
+    borderRadius: 10,
+    paddingVertical: 12,
+  },
+  connectBtnText: {
+    fontFamily: "DMSans_700Bold",
+    fontSize: 14,
+    color: Colors.background,
+  },
+  disconnectBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  disconnectText: {
     fontFamily: "DMSans_500Medium",
     fontSize: 14,
     color: "#E85D4A",

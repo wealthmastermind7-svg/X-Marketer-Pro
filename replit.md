@@ -75,8 +75,8 @@ drizzle.config.ts          - Drizzle Kit configuration
 - `DATABASE_URL` - PostgreSQL connection string (auto-provisioned)
 - `X_API_KEY` - X/Twitter API Consumer Key (secret)
 - `X_API_SECRET` - X/Twitter API Consumer Secret (secret)
-- `X_ACCESS_TOKEN` - X/Twitter Access Token (secret)
-- `X_ACCESS_TOKEN_SECRET` - X/Twitter Access Token Secret (secret)
+- `X_ACCESS_TOKEN` - X/Twitter Access Token (legacy, for testing only — per-user tokens now stored in DB)
+- `X_ACCESS_TOKEN_SECRET` - X/Twitter Access Token Secret (legacy, for testing only)
 - `EXPO_PUBLIC_DOMAIN` - Set at dev time via npm script (dev only)
 
 ## API URL Resolution (TestFlight/Production)
@@ -105,15 +105,18 @@ The app resolves the backend API URL in this priority order:
 - `GET /api/schedule` - Get user's schedule config
 - `PUT /api/schedule` - Update schedule (enabled, hour, minute, context)
 
-### X/Twitter Posting (all require auth)
-- `POST /api/tweet/post` - Post a tweet or thread to X (content, threadTweets, type)
-- `GET /api/tweet/verify` - Verify X API credentials and get username
+### X/Twitter OAuth & Posting (all require auth)
+- `GET /api/twitter/connect` - Initiate OAuth 1.0a flow, returns X authorization URL
+- `GET /api/twitter/callback` - OAuth callback (saves per-user access tokens + username)
+- `GET /api/twitter/status` - Check if user has linked their X account (returns username)
+- `DELETE /api/twitter/disconnect` - Remove user's stored X credentials
+- `POST /api/tweet/post` - Post a tweet or thread to the user's linked X account
 
 ### Other
 - `GET /api/health` - Health check
 
 ## Database Schema
 
-- **users**: id, email, password (bcrypt), display_name, default_context, created_at
+- **users**: id, email, password (bcrypt), display_name, default_context, twitter_access_token, twitter_access_secret, twitter_username, created_at
 - **reports**: id, user_id (FK), report_date, context, report_data (jsonb), generated_at
 - **schedules**: id, user_id (FK, unique), enabled, hour, minute, timezone, context

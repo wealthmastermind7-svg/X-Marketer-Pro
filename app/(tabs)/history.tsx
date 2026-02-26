@@ -49,7 +49,7 @@ function TrendBadge({ trend }: { trend: DailyReport["trends"][0] }) {
   );
 }
 
-function ReportDetail({ report }: { report: DailyReport }) {
+function ReportDetail({ report, twitterConnected }: { report: DailyReport; twitterConnected?: boolean }) {
   return (
     <Animated.View entering={FadeIn.duration(300)}>
       <View style={detailStyles.container}>
@@ -66,7 +66,7 @@ function ReportDetail({ report }: { report: DailyReport }) {
         )}
 
         {report.tweetIdeas && report.tweetIdeas.length > 0 && (
-          <TweetIdeasSection ideas={report.tweetIdeas} />
+          <TweetIdeasSection ideas={report.tweetIdeas} twitterConnected={twitterConnected} />
         )}
 
         {report.postingTimes && report.postingTimes.length > 0 && (
@@ -88,11 +88,13 @@ function HistoryItem({
   index,
   expanded,
   onToggle,
+  twitterConnected,
 }: {
   report: DailyReport;
   index: number;
   expanded: boolean;
   onToggle: () => void;
+  twitterConnected?: boolean;
 }) {
   const date = new Date(report.reportDate + "T12:00:00");
   const dayName = date.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase();
@@ -148,7 +150,7 @@ function HistoryItem({
         </View>
       </Pressable>
 
-      {expanded && <ReportDetail report={report} />}
+      {expanded && <ReportDetail report={report} twitterConnected={twitterConnected} />}
     </Animated.View>
   );
 }
@@ -158,14 +160,24 @@ export default function HistoryScreen() {
   const [reports, setReports] = useState<DailyReport[]>([]);
   const [loading, setLoading] = useState(false);
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
+  const [twitterConnected, setTwitterConnected] = useState(false);
 
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
 
   useFocusEffect(
     useCallback(() => {
       loadReports();
+      loadTwitterStatus();
     }, [])
   );
+
+  const loadTwitterStatus = async () => {
+    try {
+      const res = await apiRequest("GET", "/api/twitter/status");
+      const data = await res.json();
+      if (data.success) setTwitterConnected(data.connected);
+    } catch {}
+  };
 
   const loadReports = async () => {
     setLoading(true);
@@ -207,6 +219,7 @@ export default function HistoryScreen() {
               onToggle={() =>
                 setExpandedIndex(expandedIndex === index ? null : index)
               }
+              twitterConnected={twitterConnected}
             />
           )}
           contentContainerStyle={[
